@@ -2,7 +2,7 @@
 
 ## Live installation — 2026-10-09
 
-The existing installation is connected to real Supabase, Vercel and Timefold. Production is https://shedify.vercel.app. See [current verification results](LIVE_INFRASTRUCTURE_STATUS.md) before creating any new project. The instructions below also support a fresh installation. Public signup email confirmation still requires custom SMTP configuration.
+The existing installation is connected to real Supabase, Vercel and Timefold. Production is https://shedify.vercel.app. See [current verification results](LIVE_INFRASTRUCTURE_STATUS.md) before creating any new project. The instructions below also support a fresh installation. Current development access is restricted to authorized accounts, with public signup disabled and email verification enabled. Custom SMTP is a future unrestricted-registration requirement, not a development blocker. See [demonstration guide](DEMONSTRATION.md).
 
 ## 1. Supabase project
 
@@ -11,7 +11,7 @@ The existing installation is connected to real Supabase, Vercel and Timefold. Pr
 3. Store the server-only service-role key as `SUPABASE_SERVICE_ROLE_KEY`. Do not use a service key in a `NEXT_PUBLIC_*` variable.
 4. Apply the four numbered files in `supabase/migrations/` in order, then `supabase/live-privileges.sql`, using the SQL editor or the Supabase CLI against this project. Back up any existing database first. These migrations assume a fresh database. SQL Editor execution does not populate CLI migration history automatically; reconcile history before subsequent CLI migration pushes.
 5. Under Authentication URL settings, set the Site URL to the actual application origin and allow `/auth/callback` for local and deployed origins. Enable email confirmation. Configure password policy, email rate limits and your SMTP provider before production use.
-6. Create your own account through Shedify, confirm its email, then create your hospital. This transaction makes you administrator only of that new hospital. Existing hospital roles are granted by a hospital administrator.
+6. Use an authorized account provisioned through the permitted Supabase invitation/confirmation workflow, then create your hospital. Public signup is closed during development. Hospital onboarding makes you administrator only of the new hospital; existing hospital roles are granted by a hospital administrator.
 
 Official SSR setup: https://supabase.com/docs/guides/auth/server-side/creating-a-client
 

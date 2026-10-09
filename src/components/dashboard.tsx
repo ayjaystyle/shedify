@@ -724,14 +724,14 @@ export default function Dashboard({
             <section className="card mb-7">
               <h2>Sign in to your workspace</h2>
               <p className="muted mt-2">
-                Register a personal account, then create a hospital or ask your
-                administrator to add your membership.
+                Use an authorized development account. Ask your administrator
+                for access and hospital membership.
               </p>
               <a
                 href="/auth"
                 className="inline-block mt-4 text-emerald-800 font-semibold"
               >
-                Sign in or register →
+                Sign in →
               </a>
             </section>
           )}

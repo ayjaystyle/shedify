@@ -12,6 +12,11 @@ export async function POST(request: Request) {
         password: z.string().min(12).max(128).optional(),
       })
       .parse(await request.json());
+    if (body.mode === "register")
+      throw new AppError(
+        "Public registration is closed during development. Ask the administrator for an authorized development account.",
+        403,
+      );
     const db = await sessionDb();
     const redirect = `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`;
     let error;
@@ -20,6 +25,7 @@ export async function POST(request: Request) {
         ({ error } = await db.auth.signOut());
         break;
       case "password":
+        if (!body.password) throw new AppError("Password is required.");
         if (!(await db.auth.getUser()).data.user)
           throw new AppError("Sign in first.", 401);
         ({ error } = await db.auth.updateUser({ password: body.password }));
@@ -28,15 +34,6 @@ export async function POST(request: Request) {
         if (!body.email) throw new AppError("Email is required.");
         ({ error } = await db.auth.resetPasswordForEmail(body.email, {
           redirectTo: `${redirect}?next=/auth/reset`,
-        }));
-        break;
-      case "register":
-        if (!body.email || !body.password)
-          throw new AppError("Email and password are required.");
-        ({ error } = await db.auth.signUp({
-          email: body.email,
-          password: body.password,
-          options: { emailRedirectTo: redirect },
         }));
         break;
       case "login":

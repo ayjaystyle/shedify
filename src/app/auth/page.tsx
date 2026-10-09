@@ -33,13 +33,22 @@ export default function Auth() {
         <h1>
           {mode === "login"
             ? "Welcome back"
-            : mode === "register"
-              ? "Create your account"
-              : "Recover your account"}
+            : "Recover your account"}
         </h1>
         <p className="muted mt-2">
           Secure access to your hospital nursing rosters.
         </p>
+        <p className="muted mt-4">
+          Access is limited to authorized development accounts. Ask the
+          administrator for access. Public registration is currently closed.
+        </p>
+        {mode === "recover" && (
+          <p className="muted mt-4">
+            Development recovery emails can only be sent to addresses permitted
+            by Supabase’s built-in mail service. Contact the administrator if
+            your address is not eligible.
+          </p>
+        )}
         <form onSubmit={submit}>
           <label htmlFor="email">Email address</label>
           <input
@@ -69,9 +78,7 @@ export default function Auth() {
               ? "Please wait…"
               : mode === "login"
                 ? "Sign in"
-                : mode === "register"
-                  ? "Register"
-                  : "Send recovery email"}
+                : "Send recovery email"}
           </button>
         </form>
         {message && (
@@ -80,7 +87,7 @@ export default function Auth() {
           </p>
         )}
         <div className="flex gap-4 text-sm mt-6">
-          {["login", "register", "recover"]
+          {["login", "recover"]
             .filter((x) => x !== mode)
             .map((x) => (
               <button
@@ -93,9 +100,7 @@ export default function Auth() {
               >
                 {x === "login"
                   ? "Sign in"
-                  : x === "register"
-                    ? "Register"
-                    : "Forgot password?"}
+                  : "Forgot password?"}
               </button>
             ))}
         </div>
