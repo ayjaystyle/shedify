@@ -141,7 +141,7 @@ create function public.can_read_staff(h uuid,s uuid) returns boolean language sq
  select public.owns_staff(h,s) or exists(select 1 from public.staff where hospital_id=h and id=s and public.can_manage_ward(h,ward_id));
 $$;
 create function public.can_read_roster(h uuid,r uuid) returns boolean language sql stable security definer set search_path='' as $$
- select exists(select 1 from public.rosters where hospital_id=h and id=r and (public.can_manage_ward(h,ward_id) or (status='published' and exists(select 1 from public.staff_accounts a join public.staff s using(hospital_id) where a.staff_id=s.id and a.hospital_id=h and a.user_id=auth.uid() and s.ward_id=rosters.ward_id))));
+ select exists(select 1 from public.rosters where hospital_id=h and id=r and (public.can_manage_ward(h,ward_id) or (status='published' and exists(select 1 from public.assignments a where a.roster_id=r and a.hospital_id=h and public.owns_staff(h,a.staff_id)))));
 $$;
 create function public.can_read_shift(h uuid,s uuid) returns boolean language sql stable security definer set search_path='' as $$
  select exists(select 1 from public.shifts where hospital_id=h and id=s and public.can_manage_ward(h,ward_id)) or exists(select 1 from public.assignments a join public.rosters r on r.id=a.roster_id where a.hospital_id=h and a.shift_id=s and r.status='published' and public.owns_staff(h,a.staff_id));
@@ -151,6 +151,14 @@ do $$ declare t text; begin
  execute format('alter table public.%I enable row level security',t);
  end loop;
 end $$;
+-- Explicit grants keep the migration independent of dashboard default privileges.
+grant usage on schema public to authenticated,service_role;
+grant select on all tables in schema public to authenticated;
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+grant insert,update,delete on public.profiles,public.wards,public.ward_admins,public.ranks,public.qualifications,public.staff_qualifications,public.staff_accounts,public.shift_templates,public.shifts,public.rules,public.availability,public.preferences to authenticated;
+grant insert,update on public.staff to authenticated;
+grant insert on public.memberships,public.duty_requests to authenticated;
 create policy hospital_read on public.hospitals for select to authenticated using(public.is_member(id));
 create policy hospital_edit on public.hospitals for update to authenticated using(public.is_admin(id)) with check(public.is_admin(id));
 -- revision is never directly writable by clients.

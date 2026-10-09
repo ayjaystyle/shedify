@@ -1,4 +1,9 @@
-import {defineConfig, globalIgnores} from 'eslint/config';
-import next from 'eslint-config-next/core-web-vitals';
-import ts from 'eslint-config-next/typescript';
-export default defineConfig([...next,...ts,globalIgnores(['.next/**','next-env.d.ts'])]);
+import js from "@eslint/js";
+import ts from "typescript-eslint";
+import globals from "globals";
+export default ts.config(
+  { ignores: [".next/**", "next-env.d.ts", "node_modules/**"] },
+  js.configs.recommended,
+  ...ts.configs.recommended,
+  { languageOptions: { globals: { ...globals.node, ...globals.browser } } },
+);

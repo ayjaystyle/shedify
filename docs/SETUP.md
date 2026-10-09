@@ -1,0 +1,51 @@
+# Connect Shedify to Supabase and Vercel
+
+## Environment findings — 2026-10-09
+
+GitHub access is available. No Supabase or Vercel connector/CLI, service environment variables, local deployment metadata, or authenticated browser session was available in this development environment. The Supabase dashboard browser check timed out. This does not establish whether projects exist in your accounts; inspect your dashboards before creating duplicates.
+
+## 1. Supabase project
+
+1. Open https://supabase.com/dashboard and sign in yourself. Check for an existing `shedify` project. If none exists, create a project named `shedify` in your chosen organization and region. Enter its database password privately in Supabase; do not send it in chat.
+2. Copy the actual project URL and publishable key from the project's Connect dialog. Store them in `.env.local` as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+3. Store the server-only service-role key as `SUPABASE_SERVICE_ROLE_KEY`. Do not use a service key in a `NEXT_PUBLIC_*` variable.
+4. Apply the numbered files in `supabase/migrations/` in order, using the SQL editor or the Supabase CLI against this project. Back up any existing database first. These migrations assume a fresh database.
+5. Under Authentication URL settings, set the Site URL to the actual application origin and allow `/auth/callback` for local and deployed origins. Enable email confirmation. Configure password policy, email rate limits and your SMTP provider before production use.
+6. Create your own account through Shedify, confirm its email, then create your hospital. This transaction makes you administrator only of that new hospital. Existing hospital roles are granted by a hospital administrator.
+
+Official SSR setup: https://supabase.com/docs/guides/auth/server-side/creating-a-client
+
+## 2. Local environment
+
+Copy `.env.example` to `.env.local` and replace placeholders locally. Also configure:
+
+- `TIMEFOLD_API_KEY`: your existing Timefold key, server-only.
+- `CRON_SECRET`: at least 32 random characters, server-only.
+- `NEXT_PUBLIC_APP_URL`: the real origin, `http://localhost:3000` for local development.
+
+Use Node 24, then `npm ci`, `npm run dev`. In a separate terminal, run `node --env-file=.env.local scripts/run-worker.mjs` to process persisted jobs without depending on a browser session. Worker logs contain HTTP status only.
+
+Do not paste secrets in chat. `.env.local` is ignored by Git.
+
+## 3. Vercel deployment
+
+1. Open https://vercel.com/dashboard and sign in yourself. Check for an existing `shedify` project and its Git connection before creating another.
+2. Import `ayjaystyle/shedify`, name the project `shedify`, select Next.js, and use the repository root directory.
+3. In Git settings, use `develop/shedify-greenfield` for the deployment being verified. Do not merge to `main` merely to trigger a deployment.
+4. Add environment variables from `.env.example` through Vercel's secure environment settings. Add keys separately for the intended Preview/Production environment. Never enter secrets in source files.
+5. Obtain the actual deployment origin. Set `NEXT_PUBLIC_APP_URL` to that origin and update Supabase's Site URL and callback allowlist. Redeploy after environment changes.
+6. Verify sign-in, hospital/ward isolation, database migrations, and real scheduling before allowing operational hospital use.
+
+No deployed URL is assumed or invented in this document.
+
+## 4. Persistent background scheduling
+
+Vercel Hobby cron allows only daily jobs, which is too infrequent for asynchronous roster solving. Use Supabase Cron plus `pg_net` and Vault rather than adding a paid dependency. In Supabase Integrations, enable Cron and pg_net. In Vault, privately add `shedify_app_url` (actual deployed HTTPS origin) and `shedify_cron_secret` (same value as Vercel's `CRON_SECRET`). Run `supabase/worker-schedule.sql`, then inspect Cron history and HTTP responses. The secure `/api/cron` endpoint claims one due job per invocation. Increase capacity with an operationally reviewed scheduler if needed.
+
+Official guidance: https://supabase.com/docs/guides/functions/schedule-functions and https://vercel.com/docs/cron-jobs/usage-and-pricing
+
+## 5. Real verification checklist
+
+Create a fictional hospital and two wards, ranks and qualifications, nurses, shifts and active rules. Generate a candidate with Timefold, wait for the worker to receive its actual result, review validation, and publish only a valid candidate. Link a confirmed nurse account and verify that it sees only its own published assignments. Test a shortage and confirm publication remains blocked. Test a second hospital and a ward administrator for denied access. Submit and approve a duty-change request and verify the published assignment is unchanged.
+
+This checklist is pending until actual services are connected; mocked HTTP and local PostgreSQL tests do not substitute for it.

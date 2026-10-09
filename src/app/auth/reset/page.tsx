@@ -1,3 +1,37 @@
-'use client';
-import {useState} from 'react';
-export default function Reset(){const [message,setMessage]=useState('');return <main className="max-w-md mx-auto py-20"><section className="card"><h1>Set a new password</h1><form onSubmit={async e=>{e.preventDefault();const password=new FormData(e.currentTarget).get('password');const res=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'password',password})});if(res.ok)location.href='/';else setMessage((await res.json()).error);}}><label htmlFor="password">New password</label><input id="password" name="password" type="password" minLength={12} required autoComplete="new-password"/><button className="primary mt-6">Update password</button></form><p role="status">{message}</p></section></main>;}
+"use client";
+import { useState } from "react";
+export default function Reset() {
+  const [message, setMessage] = useState("");
+  return (
+    <main className="max-w-md mx-auto py-20">
+      <section className="card">
+        <h1>Set a new password</h1>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const password = new FormData(e.currentTarget).get("password");
+            const res = await fetch("/api/auth", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ mode: "password", password }),
+            });
+            if (res.ok) location.href = "/";
+            else setMessage((await res.json()).error);
+          }}
+        >
+          <label htmlFor="password">New password</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            minLength={12}
+            required
+            autoComplete="new-password"
+          />
+          <button className="primary mt-6">Update password</button>
+        </form>
+        <p role="status">{message}</p>
+      </section>
+    </main>
+  );
+}

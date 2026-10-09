@@ -1,0 +1,548 @@
+{
+  "source": "https://app.timefold.ai/openapis/employee-scheduling/v1",
+  "retrieved": "2026-10-09",
+  "apiVersion": "v1",
+  "sha256": "4816980bd81d4c375016621126d2862ed28b50908623c0d790109e6e4da029d8",
+  "security": {
+    "auth": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-KEY",
+      "description": "API key required to authenticate as part of Timefold Platform"
+    }
+  },
+  "components": {
+    "schemas": {
+      "ModelRequestEmployeeScheduleEmployeeScheduleConfigOverrides": {
+        "required": [
+          "modelInput"
+        ],
+        "type": "object",
+        "properties": {
+          "modelInput": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmployeeSchedule"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "EmployeeSchedule": {
+        "type": "object",
+        "properties": {
+          "contracts": {
+            "minItems": 1,
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Contract"
+            },
+            "x-uniqueItemsProperty": "id"
+          },
+          "employees": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Employee"
+            },
+            "x-uniqueItemsProperty": "id"
+          },
+          "shifts": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Shift"
+            },
+            "x-uniqueItemsProperty": "id"
+          },
+          "globalRules": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GlobalRules"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Contract": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "periodRules": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PeriodRule"
+            },
+            "x-uniqueItemsProperty": "id"
+          },
+          "consecutiveDaysWorkedRules": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsecutiveDaysWorkedRule"
+            },
+            "x-uniqueItemsProperty": "id"
+          },
+          "minutesBetweenShiftsRules": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MinutesBetweenShiftsRule"
+            },
+            "x-uniqueItemsProperty": "id"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PeriodRule": {
+        "required": [
+          "id",
+          "period"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "shiftsWorkedMax": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer",
+            "nullable": true
+          },
+          "satisfiability": {
+            "default": "REQUIRED",
+            "enum": [
+              "REQUIRED",
+              "PREFERRED"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsecutiveDaysWorkedRule": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "maximum": {
+            "format": "int32",
+            "type": "integer",
+            "nullable": true
+          },
+          "satisfiability": {
+            "default": "REQUIRED",
+            "enum": [
+              "REQUIRED",
+              "PREFERRED"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MinutesBetweenShiftsRule": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "minimumMinutesBetweenShifts": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer",
+            "nullable": true
+          },
+          "satisfiability": {
+            "default": "REQUIRED",
+            "enum": [
+              "REQUIRED",
+              "PREFERRED"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Employee": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "contracts": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractRef"
+            }
+          },
+          "skills": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Skill"
+            },
+            "x-uniqueItemsProperty": "id"
+          },
+          "unavailableTimeSpans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagAwareDateTimeSpan"
+            }
+          },
+          "preferredTimeSpans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagAwareDateTimeSpan"
+            }
+          },
+          "unpreferredTimeSpans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagAwareDateTimeSpan"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ContractRef": {
+        "type": "string"
+      },
+      "Skill": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "validityDateTimeSpans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DateTimeSpan"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "DateTimeSpan": {
+        "required": [
+          "start",
+          "end"
+        ],
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OffsetDateTime"
+              }
+            ]
+          },
+          "end": {
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OffsetDateTime"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OffsetDateTime": {
+        "format": "date-time",
+        "type": "string"
+      },
+      "TagAwareDateTimeSpan": {
+        "required": [
+          "start",
+          "end"
+        ],
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OffsetDateTime"
+              }
+            ]
+          },
+          "end": {
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OffsetDateTime"
+              }
+            ]
+          },
+          "includeShiftTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludeShiftTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shiftTagMatches": {
+            "default": "ALL",
+            "enum": [
+              "ANY",
+              "ALL"
+            ],
+            "type": "string"
+          },
+          "tags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "weight": {
+            "format": "int32",
+            "default": 1,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Shift": {
+        "required": [
+          "id",
+          "start",
+          "end"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OffsetDateTime"
+              }
+            ]
+          },
+          "end": {
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OffsetDateTime"
+              }
+            ]
+          },
+          "requiredSkills": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requiredSkillsMatchKind": {
+            "enum": [
+              "MATCH_ALL",
+              "MATCH_ANY"
+            ],
+            "type": "string"
+          },
+          "employee": {
+            "type": "string",
+            "nullable": true
+          },
+          "pinned": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GlobalRules": {
+        "type": "object",
+        "properties": {
+          "balanceShiftCountRules": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BalanceShiftCountRule"
+            },
+            "x-uniqueItemsProperty": "id"
+          },
+          "balanceTimeWorkedRules": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BalanceTimeWorkedRule"
+            },
+            "x-uniqueItemsProperty": "id"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BalanceShiftCountRule": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "includeEmployeeTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludeEmployeeTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "employeeTagMatches": {
+            "default": "ALL",
+            "enum": [
+              "ANY",
+              "ALL"
+            ],
+            "type": "string"
+          },
+          "includeShiftTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludeShiftTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shiftTagMatches": {
+            "default": "ALL",
+            "enum": [
+              "ANY",
+              "ALL"
+            ],
+            "type": "string"
+          },
+          "employeeToPublishedShiftCount": {
+            "type": "object",
+            "additionalProperties": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "BalanceTimeWorkedRule": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "includeEmployeeTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludeEmployeeTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "employeeTagMatches": {
+            "default": "ALL",
+            "enum": [
+              "ANY",
+              "ALL"
+            ],
+            "type": "string"
+          },
+          "includeShiftTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludeShiftTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shiftTagMatches": {
+            "default": "ALL",
+            "enum": [
+              "ANY",
+              "ALL"
+            ],
+            "type": "string"
+          },
+          "employeeToPublishedMinutesWorked": {
+            "type": "object",
+            "additionalProperties": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

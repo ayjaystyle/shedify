@@ -1,6 +1,40 @@
 {
-  "name": "shedify", "version": "0.1.0", "private": true,
-  "scripts": {"dev":"next dev", "build":"next build", "start":"next start", "typecheck":"tsc --noEmit", "lint":"eslint .", "test":"vitest run"},
-  "dependencies": {"next":"^16.0.0", "react":"^19.2.0", "react-dom":"^19.2.0", "@supabase/ssr":"^0.8.0", "@supabase/supabase-js":"^2.76.0", "zod":"^4.1.0", "lucide-react":"^0.468.0"},
-  "devDependencies": {"typescript":"^5.9.0", "@types/node":"^24.0.0", "@types/react":"^19.0.0", "@types/react-dom":"^19.0.0", "tailwindcss":"^4.1.0", "@tailwindcss/postcss":"^4.1.0", "eslint":"^9.0.0", "eslint-config-next":"^16.0.0", "vitest":"^3.2.0", "ajv":"^8.17.0", "ajv-formats":"^3.0.0"}
+  "name": "shedify",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.76.0",
+    "zod": "^4.1.0",
+    "lucide-react": "^0.468.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.1.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "eslint": "10.12.0",
+    "@eslint/js": "10.0.1",
+    "typescript-eslint": "8.71.1",
+    "globals": "^16.0.0",
+    "vitest": "5.0.3",
+    "prettier": "^3.0.0",
+    "ajv": "^8.17.0",
+    "ajv-formats": "^3.0.0",
+    "@electric-sql/pglite": "0.5.8"
+  },
+  "type": "module"
 }
