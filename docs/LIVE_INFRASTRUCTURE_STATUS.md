@@ -26,6 +26,8 @@ Postponed release requirement: unrestricted public registration and reliable ema
 
 Development stabilization: application registration requests explicitly return 403 before calling Supabase; the login and landing screens explain authorized access and built-in recovery-email limits. Fixed missing-password update requests so they return 400 without attempting an undefined password update. Automated suite: 57 tests across six files passed, including registration rejection, cross-origin rejection and missing-password handling. Lint, strict TypeScript and production build passed. Extended real role workflows are preserved in scripts/verify-live-workflows.mjs.
 
+Real development role workflow test passed: administrator catalogs and records, template materialization and idempotency, ranks/qualifications, availability/preferences persistence, ward-admin staff updates and denied moves outside scope, denied ward/membership changes, nurse own assignments and denied scheduling mutations, nurse duty-request submission, ward-admin approval, hospital-admin rejection, denied self-review/re-review, unchanged published assignments and denied cross-hospital access. Live application registration returned 403 and direct Supabase signup returned signup_disabled. Browser ward-admin login, scoped edit form and nurse-record save succeeded. Code checkpoint f7a5404 deployed Ready in 31 seconds at https://shedify.vercel.app. No solver code changed or mocked solver output introduced.
+
 ## Historical access audit — before account setup
 
 The findings below describe the earlier blocked checkpoint and are superseded by the current status above.

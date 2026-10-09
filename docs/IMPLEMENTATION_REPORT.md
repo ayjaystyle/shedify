@@ -1,6 +1,6 @@
 # Shedify implementation report — 2026-10-09
 
-Current status: deployed at https://shedify.vercel.app with real Supabase persistence/authentication, hospital isolation, authenticated background polling and real Timefold feasible/infeasible workflows verified. Public registration email confirmation still requires custom SMTP. See [live infrastructure results](LIVE_INFRASTRUCTURE_STATUS.md); implementation details and earlier verification checkpoints below are historical where superseded.
+Current status: deployed at https://shedify.vercel.app with real Supabase persistence/authentication, hospital isolation, authenticated background polling and real Timefold feasible/infeasible workflows verified. Authorized development role workflows passed and public self-registration is disabled with confirmation retained. Custom SMTP is postponed until unrestricted registration is needed; it does not block the demonstration. See [live infrastructure results](LIVE_INFRASTRUCTURE_STATUS.md) and [demonstration guide](DEMONSTRATION.md); implementation details and earlier verification checkpoints below are historical where superseded.
 
 ## Implemented source
 

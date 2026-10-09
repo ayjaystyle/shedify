@@ -2,6 +2,8 @@
 
 Branch: `develop/shedify-greenfield`. Repository: https://github.com/ayjaystyle/shedify
 
+Development demonstration stabilization: public signup disabled in Supabase and rejected by the deployed application, confirmation enabled, anonymous auth disabled. No paid email/domain dependency. Missing-password update validation fixed. Real administrator/ward-admin/nurse management and duty-request workflows passed, including access denials and unchanged published assignments. 57 automated tests, lint, TypeScript and production build passed. See DEMONSTRATION.md for hands-on steps and separate functional limits; SMTP is postponed until public registration is needed.
+
 Latest live checkpoint: Supabase project nhfgpufvehavkvaklgbr has all four original migrations plus function privilege hardening applied. Vercel production https://shedify.vercel.app is connected to this development branch. Real password sessions, database persistence, RLS and tenant permissions passed. Real feasible Timefold output was saved, independently validated and published; real infeasible output failed staffing validation and publication was blocked. Supabase Cron/Vault/pg_net authenticated polling returned HTTP 200. Automated suite expanded to 54 passing tests. Public signup email confirmation awaits custom SMTP. Full evidence and real job IDs are in LIVE_INFRASTRUCTURE_STATUS.md.
 
 ## 2026-10-09
