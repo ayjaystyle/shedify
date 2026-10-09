@@ -1,5 +1,25 @@
 # Live infrastructure verification — 2026-10-09
 
+## Current integration status
+
+Supabase organization `ayjay` (`sphghnylvcelggmarpzs`), project `shedify`, ID `nhfgpufvehavkvaklgbr`, URL https://nhfgpufvehavkvaklgbr.supabase.co, region eu-west-1. Dashboard status Healthy.
+
+All four existing migrations applied in order through the live SQL editor, each in a transaction, after verifying the public schema was empty. Each returned success. SQL-editor application does not automatically populate CLI migration history. Verified 22 public tables, all with RLS enabled.
+
+`scripts/verify-live-rls.sql` passed on live PostgreSQL: two-hospital isolation, ward administrator scope, nurse reads, denied writes and denied role escalation. Fixtures were rolled back. `scripts/verify-live-services.mjs` passed against real Supabase Auth/Data APIs: three confirmed fictional users signed in, getUser verified their identity, hospital onboarding and persisted ward reread succeeded, JWT tenant isolation and denied nurse writes/role escalation passed. Confirmed API-created users do not test registration emails. Fictional fixtures remain isolated for real solver testing; their credentials are in an ignored private manifest.
+
+Vercel account `ayjay2`, project `shedify`, ID `prj_YPi5e4h503h6CAwzO4XGSF2bwYjJ`. GitHub repository connected, root directory `./`, Next.js preset. Production branch tracking saved as `develop/shedify-greenfield`. Assigned domain https://shedify.vercel.app; application deployment verification pending. Initial default-main import used the empty baseline and failed to find Next.js; branch tracking was corrected before the application deployment.
+
+Configured Production Config variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_APP_URL. Configured Production Secrets: SUPABASE_SERVICE_ROLE_KEY and TIMEFOLD_API_KEY. The existing Supabase server secret key authorizes the service role. No secret values printed or committed. CRON_SECRET private entry and Vault/Cron setup are in progress.
+
+Supabase Site URL saved as https://shedify.vercel.app. Redirect allowlist includes its `/auth/callback` and `http://localhost:3000/auth/callback`.
+
+Remaining: deployed build and application-session tests, registration/email confirmation, advisors, durable worker provisioning, real feasible/infeasible Timefold results, validation, candidate persistence and publication. No mocked results substituted for live solver results.
+
+## Historical access audit — before account setup
+
+The findings below describe the earlier blocked checkpoint and are superseded by the current status above.
+
 Repository: https://github.com/ayjaystyle/shedify
 Branch: `develop/shedify-greenfield`
 Starting remote commit independently verified: `4edc41d10dcd13c22d831462a4bee961644f94b2`.
