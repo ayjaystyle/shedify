@@ -268,6 +268,45 @@ describe("PostgreSQL migrations and RLS (PGlite, emulated Supabase Auth)", () =>
       ),
     ).rejects.toThrow();
   });
+  it("prevents adding uncovered shifts to an already published period", async () => {
+    await expect(
+      asUser(admin, () =>
+        pg.query(
+          "insert into shifts(hospital_id,ward_id,name,start_at,end_at,min_staff,max_staff) values($1,$2,'Late shift','2026-10-13T07:00:00Z','2026-10-13T19:00:00Z',1,1)",
+          [hospital, ward],
+        ),
+      ),
+    ).rejects.toThrow("immutable");
+  });
+  it("lets administrators change existing roles but preserves a last administrator", async () => {
+    await asUser(admin, () =>
+      pg.query("select set_membership_role($1,$2,'nurse')", [
+        hospital,
+        wardAdmin,
+      ]),
+    );
+    expect(
+      (await asUser(wardAdmin, () => pg.query("select * from ward_admins")))
+        .rows,
+    ).toHaveLength(1);
+    expect(
+      (await asUser(wardAdmin, () => pg.query("select * from staff"))).rows,
+    ).toHaveLength(0);
+    await asUser(admin, () =>
+      pg.query("select set_membership_role($1,$2,'ward_admin')", [
+        hospital,
+        wardAdmin,
+      ]),
+    );
+    await expect(
+      asUser(admin, () =>
+        pg.query("select set_membership_role($1,$2,'nurse')", [
+          hospital,
+          admin,
+        ]),
+      ),
+    ).rejects.toThrow("at least one");
+  });
   it("approves a duty request without changing the assignment", async () => {
     const request = (
       await asUser(nurse, () =>
@@ -333,5 +372,37 @@ describe("PostgreSQL migrations and RLS (PGlite, emulated Supabase Auth)", () =>
         ]),
       ),
     ).rejects.toThrow("Ambiguous");
+  });
+  it("loads fictional two-ward sample data without inventing a roster result", async () => {
+    await pg.exec(
+      readFileSync("supabase/demo.sql", "utf8").replace(
+        "REPLACE_WITH_YOUR_HOSPITAL_UUID",
+        hospital,
+      ),
+    );
+    expect(
+      (
+        await pg.query(
+          "select * from wards where hospital_id=$1 and name like $2",
+          [hospital, "Fictional Demo %"],
+        )
+      ).rows,
+    ).toHaveLength(2);
+    expect(
+      (
+        await pg.query(
+          "select * from staff where hospital_id=$1 and full_name like $2",
+          [hospital, "Fictional Nurse %"],
+        )
+      ).rows,
+    ).toHaveLength(8);
+    expect(
+      (
+        await pg.query(
+          "select * from shift_templates where hospital_id=$1 and min_staff=50",
+          [hospital],
+        )
+      ).rows,
+    ).toHaveLength(2);
   });
 });

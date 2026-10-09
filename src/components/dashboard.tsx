@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Activity,
   Building2,
@@ -284,6 +284,42 @@ export default function Dashboard({
     jobs: Row[];
   } | null>(null);
   const [mobile, setMobile] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!form || !dialogRef.current) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog.querySelector<HTMLElement>("input,select,button")?.focus();
+    const trap = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setForm(null);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const targets = [
+        ...dialog.querySelectorAll<HTMLElement>(
+          "button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href]",
+        ),
+      ];
+      const first = targets[0],
+        last = targets.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    dialog.addEventListener("keydown", trap);
+    return () => {
+      dialog.removeEventListener("keydown", trap);
+      document.body.style.overflow = overflow;
+      previous?.focus();
+    };
+  }, [form]);
   const load = useCallback(async () => {
     if (!signedIn) return;
     setLoading(true);
@@ -331,6 +367,16 @@ export default function Dashboard({
   const admin = role === "hospital_admin";
   const current = hospitals.find((h) => h.id === hospital);
   const timezone = String(current?.timezone || "Europe/London");
+  const personalShifts =
+    role === "nurse"
+      ? [...(data.shifts || [])].sort(
+          (a, b) =>
+            Date.parse(String(a.start_at)) - Date.parse(String(b.start_at)),
+        )
+      : [];
+  const nextShift = personalShifts.find(
+    (shift) => Date.parse(String(shift.end_at)) > Date.now(),
+  );
   const begin = (entity: string, row: Row | null = null) => {
     setEditing(row);
     setForm(entity);
@@ -507,7 +553,8 @@ export default function Dashboard({
   return (
     <div className="min-h-screen flex">
       <aside
-        className={`${mobile ? "block" : "hidden"} md:block w-60 shrink-0 border-r border-[#dfe7e2] bg-[#fbfcfb] p-6 fixed md:sticky top-0 h-screen z-20`}
+        inert={form ? true : undefined}
+        className={`${mobile ? "flex" : "hidden"} md:flex flex-col w-60 shrink-0 border-r border-[#dfe7e2] bg-[#fbfcfb] p-6 fixed md:sticky top-0 h-screen z-20`}
       >
         <a href="/" className="text-3xl font-bold tracking-tight">
           shedify<span className="text-[#197b63]">.</span>
@@ -537,7 +584,7 @@ export default function Dashboard({
             <p className="text-sm">Hospital setup</p>
           )}
         </div>
-        <nav className="mt-7 space-y-2">
+        <nav className="mt-7 space-y-2 flex-1 min-h-0 overflow-y-auto">
           {navigation
             .filter(
               ([label]) =>
@@ -561,7 +608,7 @@ export default function Dashboard({
               </button>
             ))}
         </nav>
-        <div className="absolute bottom-7 left-6 right-6 border-t border-[#e0e8e2] pt-5">
+        <div className="border-t border-[#e0e8e2] pt-5 mt-5 shrink-0">
           <div className="flex items-center gap-2 text-xs muted">
             <ShieldCheck size={16} />
             Tenant isolated workspace
@@ -580,7 +627,7 @@ export default function Dashboard({
           )}
         </div>
       </aside>
-      <main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0" inert={form ? true : undefined}>
         <header className="h-20 px-6 lg:px-10 border-b border-[#e0e7e2] bg-white flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -596,6 +643,23 @@ export default function Dashboard({
             </span>
           </div>
           <div className="flex items-center gap-3">
+            {userId && (
+              <button
+                className="text-xs underline"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(userId);
+                    setMessage(
+                      "Account ID copied. Share it with your hospital administrator to link your staff record.",
+                    );
+                  } catch {
+                    setMessage(`Your account ID: ${userId}`);
+                  }
+                }}
+              >
+                Copy account ID
+              </button>
+            )}
             <span className="badge">
               {signedIn
                 ? role.replaceAll("_", " ") || "New account"
@@ -704,6 +768,61 @@ export default function Dashboard({
           )}
           {section === "Overview" && (
             <>
+              {role === "nurse" && (
+                <section className="card mb-6">
+                  <h2>Your next shift</h2>
+                  {nextShift ? (
+                    <>
+                      <p className="text-xl mt-3">{String(nextShift.name)}</p>
+                      <p className="muted mt-2">
+                        {new Date(String(nextShift.start_at)).toLocaleString(
+                          "en-GB",
+                          { timeZone: timezone },
+                        )}{" "}
+                        —{" "}
+                        {new Date(String(nextShift.end_at)).toLocaleString(
+                          "en-GB",
+                          { timeZone: timezone },
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="muted mt-3">
+                      No upcoming published assignments.
+                    </p>
+                  )}
+                  <div className="overflow-x-auto mt-6">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Shift</th>
+                          <th>Starts</th>
+                          <th>Ends</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {personalShifts.map((shift) => (
+                          <tr key={shift.id}>
+                            <td>{String(shift.name)}</td>
+                            <td>
+                              {new Date(String(shift.start_at)).toLocaleString(
+                                "en-GB",
+                                { timeZone: timezone },
+                              )}
+                            </td>
+                            <td>
+                              {new Date(String(shift.end_at)).toLocaleString(
+                                "en-GB",
+                                { timeZone: timezone },
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
               <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-7">
                 {[
                   ["Wards", counts.wards || 0, Building2],
@@ -1183,7 +1302,10 @@ export default function Dashboard({
           aria-modal="true"
           aria-labelledby="form-title"
         >
-          <section className="card w-full max-w-lg max-h-[90vh] overflow-auto">
+          <section
+            ref={dialogRef}
+            className="card w-full max-w-lg max-h-[90vh] overflow-auto"
+          >
             <div className="flex items-center justify-between">
               <h2 id="form-title">
                 {editing ? "Edit " : form === "onboard" ? "Create " : "Add "}

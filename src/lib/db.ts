@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { AppError } from "./http";
 export function configured() {
   return !!(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -8,7 +9,8 @@ export function configured() {
   );
 }
 export async function sessionDb() {
-  if (!configured()) throw new Error("Supabase configuration is missing.");
+  if (!configured())
+    throw new AppError("Supabase configuration is missing.", 503);
   const jar = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,7 +33,7 @@ export async function sessionDb() {
 }
 export function serviceDb() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !configured())
-    throw new Error("Server database configuration is missing.");
+    throw new AppError("Server database configuration is missing.", 503);
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY,

@@ -300,6 +300,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
     const data = schemas[entity].parse(body.data);
+    if (entity === "memberships") {
+      const member = schemas.memberships.parse(body.data);
+      const { error } = await db.rpc("set_membership_role", {
+        p_hospital: body.hospital_id,
+        p_user: member.user_id,
+        p_role: member.role,
+      });
+      if (error)
+        throw new AppError(
+          "Membership change failed. Use a registered account and keep at least one hospital administrator.",
+          409,
+        );
+      return NextResponse.json({ success: true });
+    }
     if (
       "end_at" in data &&
       "start_at" in data &&

@@ -2,7 +2,7 @@
 
 ## Environment findings — 2026-10-09
 
-GitHub access is available. No Supabase or Vercel connector/CLI, service environment variables, local deployment metadata, or authenticated browser session was available in this development environment. The Supabase dashboard browser check timed out. This does not establish whether projects exist in your accounts; inspect your dashboards before creating duplicates.
+GitHub access is available. No Supabase or Vercel connector/CLI, service environment variables, local deployment metadata, or authenticated browser session was available in this development environment. Both cloud dashboards eventually loaded their sign-in pages, confirming that the exposed browser is not signed in. This does not establish whether projects exist in your accounts; sign in privately and inspect your dashboards before creating duplicates.
 
 ## 1. Supabase project
 
@@ -44,7 +44,11 @@ Vercel Hobby cron allows only daily jobs, which is too infrequent for asynchrono
 
 Official guidance: https://supabase.com/docs/guides/functions/schedule-functions and https://vercel.com/docs/cron-jobs/usage-and-pricing
 
-## 5. Real verification checklist
+## 5. Optional fictional data
+
+After creating a development hospital through Shedify, optionally run `supabase/demo.sql` with its actual hospital UUID substituted for the named placeholder. It creates two fictional wards, eight nurses, ranks, qualifications, day/night templates, configurable rules, and separate deliberately infeasible templates. It creates no schedules or fake solver results. Materialize day/night templates for a chosen period and use the infeasible template in a separate period.
+
+## 6. Real verification checklist
 
 Create a fictional hospital and two wards, ranks and qualifications, nurses, shifts and active rules. Generate a candidate with Timefold, wait for the worker to receive its actual result, review validation, and publish only a valid candidate. Link a confirmed nurse account and verify that it sees only its own published assignments. Test a shortage and confirm publication remains blocked. Test a second hospital and a ward administrator for denied access. Submit and approve a duty-change request and verify the published assignment is unchanged.
 

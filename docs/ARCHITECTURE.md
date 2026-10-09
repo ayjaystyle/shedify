@@ -18,6 +18,6 @@ Each dated shift expands to its minimum staffing count in required Timefold seat
 
 Unsupported requirements are not accepted as configurable mandatory rules. Custom hospital-specific rule code, cross-ward scheduling, night-specific fairness, shift-type preferences, optional staffing optimization, replacement of published roster versions, and validated changes to published assignments are not implemented. Duty request approval records a decision only. A replacement publication workflow is required before published assignments can be revised.
 
-Current management lists show at most 500 permitted rows; the scheduling snapshot itself is not paginated. A production pagination UI and richer calendar views remain pending. Current modal focus trapping and keyboard QA remain pending. Observability and operational load testing remain pending.
+Current management lists show at most 500 permitted rows; the scheduling snapshot itself is not paginated. A production pagination UI and richer calendar views remain pending. Modals include a focus trap, Escape dismissal, inert background, and focus restoration; authenticated keyboard QA remains pending. Observability and operational load testing remain pending.
 
 PGlite tests exercise PostgreSQL SQL and RLS with emulated Supabase auth roles; they are not tests of the live Supabase Auth/email service. Timefold HTTP tests are explicitly mocked. Actual Timefold feasible/infeasible flows and deployment verification require configured services.
