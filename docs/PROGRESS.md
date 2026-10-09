@@ -2,6 +2,8 @@
 
 Branch: `develop/shedify-greenfield`. Repository: https://github.com/ayjaystyle/shedify
 
+Latest live checkpoint: Supabase project nhfgpufvehavkvaklgbr has all four original migrations plus function privilege hardening applied. Vercel production https://shedify.vercel.app is connected to this development branch. Real password sessions, database persistence, RLS and tenant permissions passed. Real feasible Timefold output was saved, independently validated and published; real infeasible output failed staffing validation and publication was blocked. Supabase Cron/Vault/pg_net authenticated polling returned HTTP 200. Automated suite expanded to 54 passing tests. Public signup email confirmation awaits custom SMTP. Full evidence and real job IDs are in LIVE_INFRASTRUCTURE_STATUS.md.
+
 ## 2026-10-09
 
 - GitHub metadata confirmed admin/push permissions. Repository was empty; no existing refs or history existed to back up. No history deleted or force push performed.

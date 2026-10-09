@@ -1,15 +1,15 @@
 # Connect Shedify to Supabase and Vercel
 
-## Environment findings — 2026-10-09
+## Live installation — 2026-10-09
 
-GitHub access is available. No Supabase or Vercel connector/CLI, service environment variables, local deployment metadata, or authenticated browser session was available in this development environment. Both cloud dashboards eventually loaded their sign-in pages, confirming that the exposed browser is not signed in. This does not establish whether projects exist in your accounts; sign in privately and inspect your dashboards before creating duplicates.
+The existing installation is connected to real Supabase, Vercel and Timefold. Production is https://shedify.vercel.app. See [current verification results](LIVE_INFRASTRUCTURE_STATUS.md) before creating any new project. The instructions below also support a fresh installation. Public signup email confirmation still requires custom SMTP configuration.
 
 ## 1. Supabase project
 
 1. Open https://supabase.com/dashboard and sign in yourself. Check for an existing `shedify` project. If none exists, create a project named `shedify` in your chosen organization and region. Enter its database password privately in Supabase; do not send it in chat.
 2. Copy the actual project URL and publishable key from the project's Connect dialog. Store them in `.env.local` as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 3. Store the server-only service-role key as `SUPABASE_SERVICE_ROLE_KEY`. Do not use a service key in a `NEXT_PUBLIC_*` variable.
-4. Apply the numbered files in `supabase/migrations/` in order, using the SQL editor or the Supabase CLI against this project. Back up any existing database first. These migrations assume a fresh database.
+4. Apply the four numbered files in `supabase/migrations/` in order, then `supabase/live-privileges.sql`, using the SQL editor or the Supabase CLI against this project. Back up any existing database first. These migrations assume a fresh database. SQL Editor execution does not populate CLI migration history automatically; reconcile history before subsequent CLI migration pushes.
 5. Under Authentication URL settings, set the Site URL to the actual application origin and allow `/auth/callback` for local and deployed origins. Enable email confirmation. Configure password policy, email rate limits and your SMTP provider before production use.
 6. Create your own account through Shedify, confirm its email, then create your hospital. This transaction makes you administrator only of that new hospital. Existing hospital roles are granted by a hospital administrator.
 
@@ -52,4 +52,4 @@ After creating a development hospital through Shedify, optionally run `supabase/
 
 Create a fictional hospital and two wards, ranks and qualifications, nurses, shifts and active rules. Generate a candidate with Timefold, wait for the worker to receive its actual result, review validation, and publish only a valid candidate. Link a confirmed nurse account and verify that it sees only its own published assignments. Test a shortage and confirm publication remains blocked. Test a second hospital and a ward administrator for denied access. Submit and approve a duty-change request and verify the published assignment is unchanged.
 
-This checklist is pending until actual services are connected; mocked HTTP and local PostgreSQL tests do not substitute for it.
+The real feasible/infeasible generation, validation, persistence, publication, nurse visibility, authentication and isolation checks passed on this installation. Reproduce backend checks with `node --env-file=.env.local scripts/verify-live-services.mjs --application` and then `node --env-file=.env.local scripts/verify-live-timefold.mjs`. These create persistent fictional fixtures and an ignored private credential manifest; run only against an explicitly selected test workflow. Registration email delivery remains pending SMTP configuration. Mocked HTTP and local PostgreSQL tests do not substitute for live verification.

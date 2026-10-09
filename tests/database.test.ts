@@ -32,6 +32,7 @@ beforeAll(async () => {
   );
   for (const file of readdirSync("supabase/migrations").sort())
     await pg.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
+  await pg.exec(readFileSync("supabase/live-privileges.sql", "utf8"));
   await pg.query("insert into auth.users values($1),($2),($3),($4)", [
     admin,
     nurse,
@@ -112,6 +113,12 @@ afterAll(async () => {
   await pg?.close();
 });
 describe("PostgreSQL migrations and RLS (PGlite, emulated Supabase Auth)", () => {
+  it("denies anonymous execution of privileged functions", async () => {
+    const result = await pg.query<{ count: number }>(
+      "select count(*)::int as count from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.prosecdef and has_function_privilege('anon',p.oid,'execute')",
+    );
+    expect(result.rows[0].count).toBe(0);
+  });
   it("isolates hospitals", async () => {
     const result = await asUser(admin, () =>
       pg.query<{ id: string }>("select id from hospitals"),

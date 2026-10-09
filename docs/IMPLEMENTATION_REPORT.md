@@ -1,6 +1,6 @@
 # Shedify implementation report — 2026-10-09
 
-Status: substantial core implementation, awaiting external service connection and live verification. This is not a declaration that the complete requested production system is finished.
+Current status: deployed at https://shedify.vercel.app with real Supabase persistence/authentication, hospital isolation, authenticated background polling and real Timefold feasible/infeasible workflows verified. Public registration email confirmation still requires custom SMTP. See [live infrastructure results](LIVE_INFRASTRUCTURE_STATUS.md); implementation details and earlier verification checkpoints below are historical where superseded.
 
 ## Implemented source
 
