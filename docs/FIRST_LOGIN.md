@@ -53,7 +53,7 @@ Verify denied cross-hospital access and denied role escalation, not just hidden 
 
 ## Invitation handling and verification
 
-The app previously handled authorization-code callbacks but had no client handler for the implicit invitation fragment returned by default Supabase invitation links. The new /auth/accept page handles only invite/recovery fragments, calls setSession and server-backed getUser, requires email confirmation, clears credentials from browser history and routes to private password setup. The Site URL landing page and /auth redirect valid invitation fragments to that handler. Unsupported, missing or expired links show a safe error.
+The app previously handled authorization-code callbacks but had no handler for the implicit invitation fragment returned by default Supabase invitation links. The /auth/accept page handles only invite/recovery fragments, clears credentials from browser history, and sends them in a same-origin HTTPS POST to the authentication route. That route calls setSession and getUser using the server cookie client, requires email confirmation, and returns the session cookies before private password setup. This avoids a browser-only session that can show “Sign in first” on password submission. The Site URL landing page and /auth redirect invitation fragments to that handler. Unsupported, missing or expired links show a safe error.
 
 Tests include verified invite acceptance, missing/wrong-type fragments, required email confirmation and safe provider errors. Delivered email and the real recipient's password setup remain separate manual verification steps; unit tests do not prove email delivery. No public signup or authorization policy changed.
 

@@ -20,3 +20,19 @@ it("rejects a missing new password before updating a user", async () => {
   expect((await POST(request({ mode: "password" }))).status).toBe(400);
   expect(updateUser).not.toHaveBeenCalled();
 });
+it("establishes invitation sessions through the server cookie client", async () => {
+  const auth = { setSession: vi.fn().mockResolvedValue({ error: null }), getUser: vi.fn().mockResolvedValue({ data: { user: { email_confirmed_at: "2026-10-10" } }, error: null }) };
+  session.mockResolvedValue({ auth });
+  const response = await POST(request({ mode: "invite", fragment: "#type=invite&access_token=access&refresh_token=refresh" }));
+  expect(response.status).toBe(200);
+  expect(auth.setSession).toHaveBeenCalledWith({ access_token: "access", refresh_token: "refresh" });
+  expect(auth.getUser).toHaveBeenCalled();
+});
+it("rejects unverified invitation users and cross-origin session transfers", async () => {
+  const auth = { setSession: vi.fn().mockResolvedValue({ error: null }), getUser: vi.fn().mockResolvedValue({ data: { user: {} }, error: null }) };
+  session.mockResolvedValue({ auth });
+  expect((await POST(request({ mode: "invite", fragment: "#type=invite&access_token=access&refresh_token=refresh" }))).status).toBe(401);
+  auth.setSession.mockClear();
+  expect((await POST(request({ mode: "invite", fragment: "#type=invite&access_token=access&refresh_token=refresh" }, "https://other.example"))).status).toBe(403);
+  expect(auth.setSession).not.toHaveBeenCalled();
+});

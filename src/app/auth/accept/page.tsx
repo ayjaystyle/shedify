@@ -1,7 +1,6 @@
 "use client";
-import { createBrowserClient } from "@supabase/ssr";
 import { useEffect, useRef, useState } from "react";
-import { acceptInvitation } from "@/lib/invitation";
+import { invitationTokens } from "@/lib/invitation";
 export default function AcceptInvitation() {
   const started = useRef(false);
   const [message, setMessage] = useState("Verifying your invitation…");
@@ -12,11 +11,15 @@ export default function AcceptInvitation() {
     window.history.replaceState(null, "", "/auth/accept");
     async function accept() {
       try {
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-        if (!url || !key) throw new Error("Authentication configuration is unavailable.");
-        const db = createBrowserClient(url, key, { auth: { detectSessionInUrl: false } });
-        await acceptInvitation(db.auth, fragment);
+        if (!invitationTokens(fragment)) throw new Error("This invitation is missing or invalid. Request a new recovery email.");
+        const response = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "invite", fragment }),
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("This invitation is invalid or expired. Request a new recovery email.");
         window.location.replace("/auth/reset");
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Unable to verify this invitation.");

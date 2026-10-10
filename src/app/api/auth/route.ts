@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { sessionDb } from "@/lib/db";
 import { AppError, failure, guardOrigin } from "@/lib/http";
+import { acceptInvitation } from "@/lib/invitation";
 export async function POST(request: Request) {
   try {
     guardOrigin(request);
     const body = z
       .object({
-        mode: z.enum(["login", "register", "recover", "logout", "password"]),
+        mode: z.enum(["login", "register", "recover", "logout", "password", "invite"]),
+        fragment: z.string().max(16384).optional(),
         email: z.email().optional(),
         password: z.string().min(12).max(128).optional(),
       })
@@ -21,6 +23,13 @@ export async function POST(request: Request) {
     const redirect = `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`;
     let error;
     switch (body.mode) {
+      case "invite":
+        try {
+          await acceptInvitation(db.auth, body.fragment || "");
+        } catch {
+          throw new AppError("This invitation is invalid or expired. Request a new recovery email.", 401);
+        }
+        break;
       case "logout":
         ({ error } = await db.auth.signOut());
         break;
