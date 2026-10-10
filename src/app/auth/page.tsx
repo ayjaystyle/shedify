@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import InvitationRedirect from "@/components/invitation-redirect";
 export default function Auth() {
   const [mode, setMode] = useState("login");
   const [message, setMessage] = useState("");
@@ -26,6 +27,7 @@ export default function Auth() {
   }
   return (
     <main className="max-w-md mx-auto px-6 py-20">
+      <InvitationRedirect />
       <a href="/" className="font-bold text-2xl">
         shedify<span className="text-emerald-700">.</span>
       </a>
