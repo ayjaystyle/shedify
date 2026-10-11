@@ -4,6 +4,7 @@ import { it, expect } from "vitest";
 import contract from "../docs/timefold-contract.json";
 import { mapRequest } from "@/solver/timefold";
 import { fixture } from "./fixtures";
+import { nursingFixture } from "./nursing-fixture";
 it("constructs a request matching the recorded official OpenAPI field schemas", () => {
   const ajv = new Ajv({ strict: false });
   addFormats(ajv);
@@ -14,4 +15,8 @@ it("constructs a request matching the recorded official OpenAPI field schemas", 
   expect(validate(mapRequest(fixture())), JSON.stringify(validate.errors)).toBe(
     true,
   );
+  expect(
+    validate(mapRequest(nursingFixture())),
+    JSON.stringify(validate.errors),
+  ).toBe(true);
 });

@@ -7,6 +7,8 @@ import {
   type Validation,
   type Violation,
 } from "./model";
+import { validateNursingPolicy } from "./nursing-policy";
+import { effectiveRule } from "./rules";
 const baseRules = [
   "minimum_staffing",
   "maximum_staffing",
@@ -100,7 +102,7 @@ export function validateRoster(
       !(Date.parse(shift.end_at) > Date.parse(shift.start_at)) ||
       day < data.roster.start_date ||
       day > data.roster.end_date ||
-      shift.max_staff < shift.min_staff
+      (shift.max_staff !== null && shift.max_staff < shift.min_staff)
     )
       fail(
         "data_integrity",
@@ -115,7 +117,7 @@ export function validateRoster(
         [],
         [shift.id],
       );
-    if (count > shift.max_staff)
+    if (shift.max_staff !== null && count > shift.max_staff)
       fail(
         "maximum_staffing",
         `${shift.name} permits at most ${shift.max_staff} staff; ${count} assigned.`,
@@ -127,8 +129,7 @@ export function validateRoster(
     fail("data_integrity", "Roster has no dated shifts.");
   for (const historical of data.history)
     add(historical.staff_id, historical.shift, false);
-  const rule = (kind: string) =>
-    data.rules.find((x) => x.kind === kind && x.active)?.value;
+  const rule = (kind: string) => effectiveRule(data, kind);
   const rest = rule("min_rest_minutes");
   const one = rule("one_shift_per_day");
   const consecutive = rule("max_consecutive_days");
@@ -205,11 +206,14 @@ export function validateRoster(
       .filter((x) => x.active && !x.kind.startsWith("fair_"))
       .map((x) => x.kind),
   ];
+  const nursing = validateNursingPolicy(data, assignments);
+  violations.push(...nursing.violations);
   return {
     valid: !violations.length,
     passedRules: evaluated.filter(
       (rule) => !violations.some((x) => x.rule === rule),
     ),
     violations,
+    warnings: nursing.warnings,
   };
 }

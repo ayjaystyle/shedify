@@ -10,6 +10,7 @@ const pick = {
     "periodRules",
     "consecutiveDaysWorkedRules",
     "minutesBetweenShiftsRules",
+    "multiDayShiftSequencePatternRules",
   ],
   Employee: [
     "id",
@@ -27,9 +28,24 @@ const pick = {
     "requiredSkillsMatchKind",
     "employee",
     "pinned",
+    "prohibitedEmployees",
+    "tags",
+    "priority",
   ],
-  GlobalRules: ["balanceShiftCountRules", "balanceTimeWorkedRules"],
-  PeriodRule: ["id", "period", "shiftsWorkedMax", "satisfiability"],
+  GlobalRules: [
+    "balanceShiftCountRules",
+    "balanceTimeWorkedRules",
+    "unassignedShiftRule",
+  ],
+  PeriodRule: [
+    "id",
+    "period",
+    "shiftsWorkedMax",
+    "daysWorkedMin",
+    "daysWorkedMax",
+    "includeShiftTags",
+    "satisfiability",
+  ],
   ConsecutiveDaysWorkedRule: ["id", "maximum", "satisfiability"],
   MinutesBetweenShiftsRule: [
     "id",
@@ -73,7 +89,7 @@ fs.writeFileSync(
   JSON.stringify(
     {
       source: "https://app.timefold.ai/openapis/employee-scheduling/v1",
-      retrieved: "2026-10-09",
+      retrieved: "2026-10-10",
       apiVersion: spec.info.version,
       sha256: crypto.createHash("sha256").update(raw).digest("hex"),
       security: spec.components.securitySchemes,

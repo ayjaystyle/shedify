@@ -1,6 +1,32 @@
 import { z } from "zod";
 import { type Assignment, type Snapshot } from "@/domain/model";
 import { zonedIso } from "@/domain/time";
+import {
+  addDays,
+  weekStart,
+  validateNursingPolicy,
+} from "@/domain/nursing-policy";
+import { effectiveRule } from "@/domain/rules";
+export function staffingSeats(data: Snapshot, s: Snapshot["shifts"][number]) {
+  const team = (data.night_teams || [])
+    .filter(
+      (n) =>
+        n.week_start ===
+        weekStart(zonedIso(s.start_at, data.timezone).slice(0, 10)),
+    )
+    .map((n) => n.staff_id)
+    .sort();
+  if (data.policy && s.shift_type === "night")
+    return Math.max(s.min_staff, team.length);
+  if (data.policy && s.shift_type === "morning")
+    return (
+      s.max_staff ??
+      data.staff.filter(
+        (n) => n.active && n.eligible && n.category !== "attendant",
+      ).length
+    );
+  return s.min_staff;
+}
 export const TIMEFOLD_BASE =
   "https://app.timefold.ai/api/models/employee-scheduling/v1";
 export interface SolverAdapter {
@@ -87,17 +113,59 @@ export class TimefoldAdapter implements SolverAdapter {
   }
 }
 export function mapRequest(data: Snapshot) {
-  const rule = (kind: string) =>
-    data.rules.find((x) => x.active && x.kind === kind)?.value;
+  const rule = (kind: string) => effectiveRule(data, kind);
   const time = (instant: string) => zonedIso(instant, data.timezone);
   const eligible = data.staff.filter(
-    (s) => s.active && s.eligible && s.ward_id === data.roster.ward_id,
+    (s) =>
+      s.active &&
+      s.eligible &&
+      s.category !== "attendant" &&
+      s.ward_id === data.roster.ward_id,
   );
   if (!eligible.length || !data.shifts.length)
     throw new SolverError("Eligible staff and dated shifts are required.");
+  if (data.policy) {
+    const setup = validateNursingPolicy(data, []).violations.filter((v) =>
+      [
+        "night_safety_review",
+        "night_duration",
+        "shift_times",
+        "shift_type",
+        "senior_configuration",
+        "rotation_permission_conflict",
+        "night_frequency",
+        "four_week_period",
+        "night_team_size",
+        "night_team_senior",
+        "night_team_eligibility",
+        "night_team_unavailability",
+      ].includes(v.rule),
+    );
+    if (setup.length)
+      throw new SolverError(
+        setup
+          .slice(0, 3)
+          .map((v) => v.message)
+          .join(" "),
+      );
+  }
   const contract = {
     id: "ward-contract",
-    ...(rule("one_shift_per_day")
+    ...(data.policy
+      ? {
+          multiDayShiftSequencePatternRules: [
+            {
+              id: "no-afternoon-to-morning",
+              satisfiability: "PROHIBITED",
+              pattern: [
+                { type: "ON", includeShiftTags: ["afternoon"] },
+                { type: "ON", includeShiftTags: ["morning"] },
+              ],
+            },
+          ],
+        }
+      : {}),
+    ...(rule("one_shift_per_day") || data.policy
       ? {
           periodRules: [
             {
@@ -132,32 +200,171 @@ export function mapRequest(data: Snapshot) {
         }
       : {}),
   };
+  const contracts = [
+    {
+      ...contract,
+      ...(data.policy
+        ? {
+            periodRules: [
+              ...(contract.periodRules || []),
+              {
+                id: "ordinary-week",
+                period: "WEEK",
+                daysWorkedMax: 4,
+                includeShiftTags: ["ordinary-duty"],
+                satisfiability: "REQUIRED",
+                shiftsWorkedMax: undefined,
+              },
+              {
+                id: "ordinary-week-target",
+                period: "WEEK",
+                daysWorkedMin: 4,
+                daysWorkedMax: 4,
+                includeShiftTags: ["ordinary-duty"],
+                satisfiability: "PREFERRED",
+                shiftsWorkedMax: undefined,
+              },
+            ],
+          }
+        : {}),
+    },
+  ];
   const employees = eligible.map((s) => ({
     id: s.id,
     contracts: ["ward-contract"],
-    skills: [...s.skills, ...(s.rank_id ? [`rank:${s.rank_id}`] : [])].map(
-      (id) => ({ id }),
-    ),
+    skills: [
+      ...s.skills,
+      ...(s.rank_id ? [`rank:${s.rank_id}`] : []),
+      ...(s.rank_id && data.policy?.senior_rank_ids.includes(s.rank_id)
+        ? ["shedify:senior"]
+        : []),
+    ].map((id) => ({ id })),
     unavailableTimeSpans: data.availability
       .filter((x) => x.staff_id === s.id)
       .map((x) => ({ start: time(x.start_at), end: time(x.end_at) })),
     preferredTimeSpans: data.preferences
       .filter((x) => x.staff_id === s.id && x.preferred)
-      .map((x) => ({ start: time(x.start_at), end: time(x.end_at) })),
+      .flatMap((x) =>
+        !x.shift_type || x.shift_type === "all"
+          ? [{ start: time(x.start_at), end: time(x.end_at) }]
+          : data.shifts
+              .filter(
+                (shift) =>
+                  shift.shift_type === x.shift_type &&
+                  Date.parse(shift.start_at) >= Date.parse(x.start_at) &&
+                  Date.parse(shift.start_at) < Date.parse(x.end_at),
+              )
+              .map((shift) => ({
+                start: time(shift.start_at),
+                end: time(shift.end_at),
+              })),
+      ),
     unpreferredTimeSpans: data.preferences
       .filter((x) => x.staff_id === s.id && !x.preferred)
-      .map((x) => ({ start: time(x.start_at), end: time(x.end_at) })),
+      .flatMap((x) =>
+        !x.shift_type || x.shift_type === "all"
+          ? [{ start: time(x.start_at), end: time(x.end_at) }]
+          : data.shifts
+              .filter(
+                (shift) =>
+                  shift.shift_type === x.shift_type &&
+                  Date.parse(shift.start_at) >= Date.parse(x.start_at) &&
+                  Date.parse(shift.start_at) < Date.parse(x.end_at),
+              )
+              .map((shift) => ({
+                start: time(shift.start_at),
+                end: time(shift.end_at),
+              })),
+      ),
   }));
   // Each shift instance is expanded into required staffing seats. No optional seats are silently invented.
-  const shifts = data.shifts.flatMap((s) =>
-    Array.from({ length: s.min_staff }, (_, i) => ({
+  const shifts = data.shifts.flatMap((s) => {
+    const day = time(s.start_at).slice(0, 10),
+      week = weekStart(day);
+    const team = (data.night_teams || [])
+      .filter((n) => n.week_start === week)
+      .map((n) => n.staff_id)
+      .sort();
+    const commitments = [
+      ...(data.obligations || []).map((o) => ({
+        staff_id: o.staff_id,
+        week_start: o.night_start,
+      })),
+      ...(data.night_teams || []),
+    ];
+    const prohibited = eligible
+      .filter((n) => {
+        if (
+          s.shift_type &&
+          s.shift_type !== "unspecified" &&
+          n[`${s.shift_type}_enabled`] === false
+        )
+          return true;
+        if (!data.policy) return false;
+        const weekend = new Date(day + "T00:00:00Z").getUTCDay() % 6 === 0;
+        const restricted =
+          n.no_weekends ||
+          n.id === data.policy.head_staff_id ||
+          (n.rank_id && data.policy.no_weekend_rank_ids.includes(n.rank_id));
+        if (restricted && weekend) return true;
+        if (
+          (n.id === data.policy.head_staff_id ||
+            (n.rank_id &&
+              data.policy.no_weekend_rank_ids.includes(n.rank_id))) &&
+          s.shift_type !== "morning"
+        )
+          return true;
+        if (team.includes(n.id) && s.shift_type !== "night") return true;
+        if (s.shift_type === "night" && !team.includes(n.id)) return true;
+        if (
+          commitments.some(
+            (o) =>
+              o.staff_id === n.id &&
+              (week === addDays(o.week_start, 7) ||
+                (week === addDays(o.week_start, 14) &&
+                  s.shift_type !== "afternoon")),
+          )
+        )
+          return true;
+        if (
+          data.availability.some(
+            (a) =>
+              a.staff_id === n.id &&
+              a.leave_type === "annual" &&
+              day >= time(a.end_at).slice(0, 10) &&
+              week === weekStart(time(a.end_at).slice(0, 10)) &&
+              s.shift_type !== "morning",
+          )
+        )
+          return true;
+        return false;
+      })
+      .map((n) => n.id);
+    return Array.from({ length: staffingSeats(data, s) }, (_, i) => ({
       id: `${s.id}:${i}`,
       start: time(s.start_at),
       end: time(s.end_at),
-      requiredSkills: s.required_skills,
+      requiredSkills: [
+        ...s.required_skills,
+        ...(data.policy && i === 0 && s.shift_type !== "night"
+          ? ["shedify:senior"]
+          : []),
+      ],
       requiredSkillsMatchKind: "MATCH_ALL",
-    })),
-  );
+      prohibitedEmployees: prohibited,
+      tags: [
+        s.shift_type || "unspecified",
+        s.shift_type === "night" ? "night-duty" : "ordinary-duty",
+      ],
+      priority:
+        data.policy && s.shift_type === "morning" && i >= s.min_staff
+          ? "5"
+          : "1",
+      ...(data.policy && s.shift_type === "night" && team[i]
+        ? { employee: team[i], pinned: true }
+        : {}),
+    }));
+  });
   const employeeIds = new Set(employees.map((e) => e.id));
   const history = data.history
     .filter((x) => employeeIds.has(x.staff_id))
@@ -167,13 +374,24 @@ export function mapRequest(data: Snapshot) {
       end: time(x.shift.end_at),
       employee: x.staff_id,
       pinned: true,
+      tags: [
+        x.shift.shift_type || "unspecified",
+        x.shift.shift_type === "night" ? "night-duty" : "ordinary-duty",
+      ],
     }));
   return {
     modelInput: {
-      contracts: [contract],
+      contracts,
       employees,
       shifts: [...history, ...shifts],
       globalRules: {
+        unassignedShiftRule: {
+          id: "staffing-priority",
+          priorityWeights: [
+            { priority: "1", weight: 100, assignment: "MANDATORY" },
+            { priority: "5", weight: 1, assignment: "OPTIONAL" },
+          ],
+        },
         ...(rule("fair_shifts")
           ? { balanceShiftCountRules: [{ id: "fair-shifts" }] }
           : {}),
@@ -200,7 +418,7 @@ export function parseResult(raw: unknown, data: Snapshot): Assignment[] {
   const expected = new Map<string, string>(
     data.shifts.flatMap((s) =>
       Array.from(
-        { length: s.min_staff },
+        { length: staffingSeats(data, s) },
         (_, i) => [`${s.id}:${i}`, s.id] as const,
       ),
     ),

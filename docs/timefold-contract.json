@@ -1,8 +1,8 @@
 {
   "source": "https://app.timefold.ai/openapis/employee-scheduling/v1",
-  "retrieved": "2026-10-09",
+  "retrieved": "2026-10-10",
   "apiVersion": "v1",
-  "sha256": "4816980bd81d4c375016621126d2862ed28b50908623c0d790109e6e4da029d8",
+  "sha256": "aacfe842a42c67c42821ea341c82ac561858d6dfeca92d353a12c75f7747150d",
   "security": {
     "auth": {
       "type": "apiKey",
@@ -101,6 +101,14 @@
               "$ref": "#/components/schemas/MinutesBetweenShiftsRule"
             },
             "x-uniqueItemsProperty": "id"
+          },
+          "multiDayShiftSequencePatternRules": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MultiDayShiftSequencePatternRule"
+            },
+            "x-uniqueItemsProperty": "id"
           }
         },
         "additionalProperties": false
@@ -123,6 +131,25 @@
             "minimum": 0,
             "type": "integer",
             "nullable": true
+          },
+          "daysWorkedMin": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer",
+            "nullable": true
+          },
+          "daysWorkedMax": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer",
+            "nullable": true
+          },
+          "includeShiftTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "satisfiability": {
             "default": "REQUIRED",
@@ -180,6 +207,86 @@
             "enum": [
               "REQUIRED",
               "PREFERRED"
+            ],
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MultiDayShiftSequencePatternRule": {
+        "required": [
+          "id",
+          "pattern"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "satisfiability": {
+            "default": "REQUIRED",
+            "enum": [
+              "REQUIRED",
+              "PROHIBITED",
+              "PREFERRED",
+              "UNPREFERRED"
+            ],
+            "type": "string"
+          },
+          "weight": {
+            "format": "int64",
+            "default": 1,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "pattern": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MultiDayShiftSequencePatternElement"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "MultiDayShiftSequencePatternElement": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "default": "ON",
+            "enum": [
+              "ON",
+              "OFF"
+            ],
+            "type": "string"
+          },
+          "includeShiftTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludeShiftTags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shiftTagMatches": {
+            "default": "ALL",
+            "enum": [
+              "ANY",
+              "ALL"
+            ],
+            "type": "string"
+          },
+          "shiftMatches": {
+            "default": "ALL",
+            "enum": [
+              "ALL",
+              "ANY"
             ],
             "type": "string"
           }
@@ -391,9 +498,50 @@
           "pinned": {
             "default": false,
             "type": "boolean"
+          },
+          "prohibitedEmployees": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority": {
+            "type": "string",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Priority"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "nullable": true
           }
         },
         "additionalProperties": false
+      },
+      "Priority": {
+        "enum": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
+        ],
+        "type": "string"
       },
       "GlobalRules": {
         "type": "object",
@@ -413,6 +561,14 @@
               "$ref": "#/components/schemas/BalanceTimeWorkedRule"
             },
             "x-uniqueItemsProperty": "id"
+          },
+          "unassignedShiftRule": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UnassignedShiftRule"
+              }
+            ]
           }
         },
         "additionalProperties": false
@@ -539,6 +695,52 @@
               "format": "int32",
               "type": "integer"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "UnassignedShiftRule": {
+        "required": [
+          "id",
+          "priorityWeights"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "priorityWeights": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriorityConfiguration"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PriorityConfiguration": {
+        "required": [
+          "priority",
+          "weight"
+        ],
+        "type": "object",
+        "properties": {
+          "priority": {
+            "type": "string"
+          },
+          "weight": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "assignment": {
+            "default": "MANDATORY",
+            "enum": [
+              "MANDATORY",
+              "OPTIONAL"
+            ],
+            "type": "string"
           }
         },
         "additionalProperties": false

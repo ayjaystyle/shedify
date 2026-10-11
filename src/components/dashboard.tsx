@@ -15,6 +15,10 @@ import {
   LogOut,
 } from "lucide-react";
 import type { Snapshot, Assignment, Validation } from "@/domain/model";
+import { RosterGrid } from "./roster-grid";
+import { localDay } from "@/domain/model";
+import { localMidnight } from "@/domain/time";
+import { addDays } from "@/domain/nursing-policy";
 type Row = Record<string, unknown> & { id?: string };
 type Field = {
   key: string;
@@ -24,6 +28,7 @@ type Field = {
   source?: string;
   optional?: boolean;
   default?: string;
+  hospitalOnly?: boolean;
 };
 const ward: Field = { key: "ward_id", label: "Ward", source: "wards" };
 const staff: Field = { key: "staff_id", label: "Nurse", source: "staff" };
@@ -37,11 +42,57 @@ const catalog: Record<string, { title: string; fields: Field[] }> = {
       { key: "rank_id", label: "Rank", source: "ranks", optional: true },
       { key: "active", label: "Active", type: "checkbox" },
       { key: "eligible", label: "Eligible for scheduling", type: "checkbox" },
+      {
+        key: "morning_enabled",
+        label: "Permitted Shifts — Morning",
+        type: "checkbox",
+      },
+      {
+        key: "afternoon_enabled",
+        label: "Permitted Shifts — Afternoon",
+        type: "checkbox",
+      },
+      {
+        key: "night_enabled",
+        label: "Permitted Shifts — Night",
+        type: "checkbox",
+      },
+      {
+        key: "no_weekends",
+        label: "No weekend duty",
+        type: "checkbox",
+        default: "false",
+      },
+      {
+        key: "permissions_locked",
+        label: "Lock shift permissions under hospital authority",
+        type: "checkbox",
+        default: "false",
+        hospitalOnly: true,
+      },
+      {
+        key: "category",
+        label: "Staff category",
+        options: [
+          ["nurse", "Nurse"],
+          ["attendant", "Health Attendant / Assistant"],
+        ],
+      },
     ],
   },
   ranks: {
     title: "Nursing rank",
-    fields: [{ key: "name", label: "Rank name" }],
+    fields: [
+      { key: "name", label: "Rank name" },
+      { key: "abbreviation", label: "Abbreviation", optional: true },
+      {
+        key: "seniority",
+        label: "Seniority (higher number appears first)",
+        type: "number",
+        default: "0",
+      },
+      { key: "active", label: "Active rank", type: "checkbox" },
+    ],
   },
   qualifications: {
     title: "Qualification",
@@ -63,6 +114,19 @@ const catalog: Record<string, { title: string; fields: Field[] }> = {
     fields: [
       { key: "name", label: "Shift name" },
       ward,
+      {
+        key: "shift_type",
+        label: "Duty type",
+        options: [
+          ["morning", "Morning"],
+          ["afternoon", "Afternoon"],
+          ["night", "Night"],
+          [
+            "unspecified",
+            "Unclassified — publication blocked under nursing policy",
+          ],
+        ],
+      },
       { key: "start_time", label: "Start time", type: "time" },
       { key: "end_time", label: "End time", type: "time" },
       {
@@ -75,19 +139,107 @@ const catalog: Record<string, { title: string; fields: Field[] }> = {
         key: "max_staff",
         label: "Maximum staff",
         type: "number",
-        default: "1",
+        optional: true,
       },
       {
         key: "required_skills",
-        label: "Required qualification IDs or rank:ID (comma separated)",
-        type: "array",
+        label:
+          "Required qualifications/ranks (all selected requirements apply to every seat)",
+        type: "multi",
+        source: "skills",
         optional: true,
+      },
+      {
+        key: "weekday_min",
+        label: "Staffing by Day — Monday–Friday minimum (blank uses default)",
+        type: "number",
+        optional: true,
+      },
+      {
+        key: "weekday_max",
+        label:
+          "Monday–Friday maximum (blank means no fixed limit when override minimum is set)",
+        type: "number",
+        optional: true,
+      },
+      {
+        key: "weekend_min",
+        label: "Saturday–Sunday minimum (blank uses default)",
+        type: "number",
+        optional: true,
+      },
+      {
+        key: "weekend_max",
+        label: "Saturday–Sunday maximum",
+        type: "number",
+        optional: true,
+      },
+      {
+        key: "special_day",
+        label: "Optional individual-day override",
+        optional: true,
+        options: [
+          ["0", "Sunday"],
+          ["1", "Monday"],
+          ["2", "Tuesday"],
+          ["3", "Wednesday"],
+          ["4", "Thursday"],
+          ["5", "Friday"],
+          ["6", "Saturday"],
+        ],
+      },
+      {
+        key: "special_min",
+        label: "Individual-day minimum",
+        type: "number",
+        optional: true,
+      },
+      {
+        key: "special_max",
+        label: "Individual-day maximum",
+        type: "number",
+        optional: true,
+      },
+      {
+        key: "effective_from",
+        label: "Override effective from",
+        type: "date",
+        optional: true,
+      },
+      {
+        key: "effective_until",
+        label: "Override effective until",
+        type: "date",
+        optional: true,
+      },
+      {
+        key: "times_confirmed",
+        label:
+          "I have checked and confirmed the actual shift hours shown above",
+        type: "checkbox",
+        default: "false",
       },
     ],
   },
   shifts: {
     title: "Dated shift",
     fields: [
+      {
+        key: "shift_type",
+        label: "Shift type",
+        options: [
+          ["morning", "Morning"],
+          ["afternoon", "Afternoon"],
+          ["night", "Night"],
+          ["unspecified", "Needs classification"],
+        ],
+      },
+      {
+        key: "times_confirmed",
+        label: "I have checked and confirmed these actual dated shift hours",
+        type: "checkbox",
+        default: "false",
+      },
       { key: "name", label: "Shift name" },
       ward,
       {
@@ -108,14 +260,15 @@ const catalog: Record<string, { title: string; fields: Field[] }> = {
       },
       {
         key: "max_staff",
-        label: "Maximum staff",
+        label: "Maximum staff (blank means unlimited)",
         type: "number",
-        default: "1",
+        optional: true,
       },
       {
         key: "required_skills",
-        label: "Required qualification IDs or rank:ID (comma separated)",
-        type: "array",
+        label: "Required qualifications and ranks",
+        type: "multi",
+        source: "skills",
         optional: true,
       },
     ],
@@ -148,17 +301,119 @@ const catalog: Record<string, { title: string; fields: Field[] }> = {
     title: "Mandatory unavailability",
     fields: [
       staff,
-      { key: "start_at", label: "Start (ISO with offset)" },
-      { key: "end_at", label: "End (ISO with offset)" },
+      { key: "start_at", label: "First unavailable date", type: "date" },
+      {
+        key: "end_at",
+        label: "Last unavailable date (inclusive)",
+        type: "date",
+      },
+      {
+        key: "leave_type",
+        label: "Leave / unavailability type",
+        options: [
+          ["unavailable", "Mandatory unavailability"],
+          ["annual", "Approved annual leave"],
+          ["sick", "Sick leave"],
+          ["other", "Other approved absence"],
+        ],
+      },
+      { key: "note", label: "Note", optional: true },
     ],
   },
   preferences: {
     title: "Preference",
     fields: [
       staff,
-      { key: "start_at", label: "Start (ISO with offset)" },
-      { key: "end_at", label: "End (ISO with offset)" },
-      { key: "preferred", label: "Prefer working this time", type: "checkbox" },
+      { key: "start_at", label: "First date", type: "date" },
+      { key: "end_at", label: "Last date (inclusive)", type: "date" },
+      {
+        key: "shift_type",
+        label: "Shift",
+        options: [
+          ["all", "All"],
+          ["morning", "Morning"],
+          ["afternoon", "Afternoon"],
+          ["night", "Night"],
+        ],
+      },
+      {
+        key: "preferred",
+        label: "Preference type",
+        options: [
+          ["true", "Prefer to work"],
+          ["false", "Prefer to be Off"],
+        ],
+      },
+      { key: "note", label: "Explanation (optional)", optional: true },
+    ],
+  },
+  ward_policies: {
+    title: "Ward nursing policy",
+    fields: [
+      ward,
+      {
+        key: "enabled",
+        label: "Apply mandatory four-week nursing policy",
+        type: "checkbox",
+        default: "false",
+      },
+      {
+        key: "effective_from",
+        label: "First roster date this policy applies to",
+        type: "date",
+      },
+      {
+        key: "senior_rank_ids",
+        label: "Ranks qualifying for senior coverage",
+        type: "multi",
+        source: "ranks",
+      },
+      {
+        key: "no_weekend_rank_ids",
+        label: "Ranks restricted to weekday Morning duty",
+        type: "multi",
+        source: "ranks",
+        optional: true,
+      },
+      {
+        key: "head_staff_id",
+        label: "Designated head-in-charge",
+        source: "staff",
+        optional: true,
+      },
+      {
+        key: "max_night_minutes",
+        label: "Approved maximum Night duration (minutes)",
+        type: "number",
+        optional: true,
+      },
+      {
+        key: "safety_reference",
+        label: "Institutional Night-duty policy / approval reference",
+        optional: true,
+      },
+      {
+        key: "institutional_approved",
+        label: "Hospital oversight: institutional approval verified",
+        type: "checkbox",
+        default: "false",
+        hospitalOnly: true,
+      },
+    ],
+  },
+  night_teams: {
+    title: "Fixed seven-night team member",
+    fields: [
+      { key: "roster_id", label: "Four-week roster", source: "rosters" },
+      staff,
+      { key: "week_start", label: "Night week starts on Monday", type: "date" },
+    ],
+  },
+  public_holidays: {
+    title: "Public holiday for administrative review",
+    fields: [
+      { key: "day", label: "Date", type: "date" },
+      { key: "name", label: "Holiday name" },
     ],
   },
   staff_accounts: {
@@ -224,6 +479,18 @@ const catalog: Record<string, { title: string; fields: Field[] }> = {
       { key: "timezone", label: "IANA time zone", default: "Europe/London" },
       { key: "contact", label: "Contact", optional: true },
       { key: "location", label: "Location", optional: true },
+      {
+        key: "maximum_consecutive_days",
+        label: "Hospital-wide maximum consecutive days (blank: ward rule)",
+        type: "number",
+        optional: true,
+      },
+      {
+        key: "minimum_rest_minutes",
+        label: "Hospital-wide minimum rest in minutes (blank: ward rule)",
+        type: "number",
+        optional: true,
+      },
     ],
   },
 };
@@ -276,6 +543,7 @@ export default function Dashboard({
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<string | null>(null);
+  const [clockPreview, setClockPreview] = useState({ start: "", end: "" });
   const [editing, setEditing] = useState<Row | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<{
@@ -331,6 +599,11 @@ export default function Dashboard({
       if (chosen) {
         if (!hospital) setHospital(chosen);
         const work = await call(`/api/workspace?hospital=${chosen}`);
+        if (work.data.ranks)
+          work.data.ranks.sort(
+            (a: Row, b: Row) =>
+              Number(b.seniority || 0) - Number(a.seniority || 0),
+          );
         setData(work.data);
         setCounts(work.counts);
         setRole(work.role);
@@ -365,6 +638,7 @@ export default function Dashboard({
     return () => clearInterval(timer);
   }, [selected, detail, openRoster]);
   const admin = role === "hospital_admin";
+  const manager = admin || role === "ward_admin";
   const current = hospitals.find((h) => h.id === hospital);
   const timezone = String(current?.timezone || "Europe/London");
   const personalShifts =
@@ -380,6 +654,10 @@ export default function Dashboard({
   const begin = (entity: string, row: Row | null = null) => {
     setEditing(row);
     setForm(entity);
+    setClockPreview({
+      start: String(row?.start_time || ""),
+      end: String(row?.end_time || ""),
+    });
     setMessage("");
   };
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -387,20 +665,42 @@ export default function Dashboard({
     if (!form) return;
     const raw = new FormData(e.currentTarget);
     const payload: Record<string, unknown> = {};
-    for (const field of (form === "onboard" ? catalog.hospitals : catalog[form])
-      .fields) {
+    for (const field of (form === "onboard"
+      ? catalog.hospitals
+      : catalog[form]
+    ).fields.filter((f) => !f.hospitalOnly || admin)) {
       const value = raw.get(field.key);
       payload[field.key] =
         field.type === "checkbox"
           ? value === "on"
-          : field.type === "number"
-            ? Number(value)
-            : field.type === "array"
-              ? String(value || "")
-                  .split(",")
-                  .map((x) => x.trim())
-                  .filter(Boolean)
-              : value || null;
+          : field.type === "multi"
+            ? raw.getAll(field.key).map(String)
+            : field.type === "number"
+              ? value === ""
+                ? null
+                : Number(value)
+              : field.type === "array"
+                ? String(value || "")
+                    .split(",")
+                    .map((x) => x.trim())
+                    .filter(Boolean)
+                : value || null;
+    }
+    if (payload.special_day !== undefined)
+      payload.special_day =
+        payload.special_day === null ? null : Number(payload.special_day);
+    if (form === "preferences")
+      payload.preferred = payload.preferred === "true";
+    if (form === "availability" || form === "preferences") {
+      if (String(payload.end_at) < String(payload.start_at)) {
+        setMessage("The last date must not precede the first date.");
+        return;
+      }
+      payload.start_at = localMidnight(String(payload.start_at), timezone);
+      payload.end_at = localMidnight(
+        addDays(String(payload.end_at), 1),
+        timezone,
+      );
     }
     setLoading(true);
     try {
@@ -513,6 +813,45 @@ export default function Dashboard({
                     >
                       Edit
                     </button>
+                    {[
+                      "availability",
+                      "preferences",
+                      "night_teams",
+                      "public_holidays",
+                      "ranks",
+                    ].includes(entity) && (
+                      <button
+                        className="text-red-800 underline text-sm ml-3"
+                        onClick={async () => {
+                          if (
+                            !window.confirm(
+                              entity === "ranks"
+                                ? "Delete this unused rank? Assigned or referenced ranks cannot be deleted. Archive them instead."
+                                : "Remove this record?",
+                            )
+                          )
+                            return;
+                          try {
+                            await call("/api/workspace", {
+                              action: "delete",
+                              hospital_id: hospital,
+                              entity,
+                              id: row.id,
+                              data: {},
+                            });
+                            await load();
+                          } catch (error) {
+                            setMessage(
+                              error instanceof Error
+                                ? error.message
+                                : "Removal failed",
+                            );
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 )}
               </tr>
@@ -920,7 +1259,15 @@ export default function Dashboard({
                 )}
                 {renderTable(
                   "staff",
-                  ["full_name", "ward_id", "active", "eligible"],
+                  [
+                    "full_name",
+                    "rank_id",
+                    "active",
+                    "eligible",
+                    "morning_enabled",
+                    "afternoon_enabled",
+                    "night_enabled",
+                  ],
                   admin || role === "ward_admin",
                 )}
               </section>
@@ -931,7 +1278,11 @@ export default function Dashboard({
                     "qualifications",
                     "staff_qualifications",
                   ])}
-                  {renderTable("ranks", ["name", "id"])}
+                  {renderTable(
+                    "ranks",
+                    ["name", "abbreviation", "seniority", "active"],
+                    true,
+                  )}
                   {renderTable("qualifications", ["name", "id"])}
                   {renderTable("staff_qualifications", [
                     "staff_id",
@@ -946,7 +1297,7 @@ export default function Dashboard({
               <section className="card mb-5">
                 {toolbar(
                   "Shift templates",
-                  admin ? ["shift_templates", "materialize"] : [],
+                  manager ? ["shift_templates", "materialize"] : [],
                 )}
                 <p className="muted mb-4">
                   Times use the hospital time zone: {timezone}. Overnight
@@ -955,21 +1306,60 @@ export default function Dashboard({
                 {renderTable(
                   "shift_templates",
                   ["name", "start_time", "end_time", "min_staff", "max_staff"],
-                  admin,
+                  manager,
                 )}
               </section>
               <section className="card">
-                {toolbar("Dated shifts", admin ? ["shifts"] : [])}
+                {toolbar("Dated shifts", manager ? ["shifts"] : [])}
                 {renderTable(
                   "shifts",
                   ["name", "start_at", "end_at", "min_staff", "max_staff"],
-                  admin,
+                  manager,
                 )}
               </section>
             </>
           )}
           {section === "Rules" && (
             <>
+              <section className="card mb-5">
+                {toolbar(
+                  "Mandatory nursing policy & Night-duty approval",
+                  manager ? ["ward_policies", "night_teams"] : [],
+                )}
+                <p className="muted mb-4">
+                  Configure senior ranks and designated staff explicitly. Select
+                  each fixed Night-team member once per Monday week. Every Night
+                  creates a compulsory Off week and then an Afternoon week;
+                  these obligations survive publication. Institutional Night
+                  approval is separate from ward configuration. Ordinary weeks
+                  require four working days; solver minimum support remains
+                  limited, so independent validation blocks short weeks.
+                </p>
+                {renderTable(
+                  "ward_policies",
+                  [
+                    "ward_id",
+                    "enabled",
+                    "effective_from",
+                    "max_night_minutes",
+                    "safety_reference",
+                    "institutional_approved",
+                  ],
+                  manager,
+                )}
+                {renderTable(
+                  "night_teams",
+                  ["roster_id", "staff_id", "week_start"],
+                  manager,
+                )}
+                <h3 className="mt-6">Persisted rotation obligations</h3>
+                {renderTable("rotation_obligations", [
+                  "staff_id",
+                  "night_start",
+                  "off_start",
+                  "afternoon_start",
+                ])}
+              </section>
               <section className="card mb-5">
                 {toolbar("Scheduling constraints", admin ? ["rules"] : [])}
                 <p className="muted mb-4">
@@ -983,28 +1373,32 @@ export default function Dashboard({
                 )}
               </section>
               <section className="card mb-5">
-                {toolbar("Unavailability", admin ? ["availability"] : [])}
-                {renderTable("availability", [
-                  "staff_id",
-                  "start_at",
-                  "end_at",
-                ])}
+                {toolbar("Unavailability", manager ? ["availability"] : [])}
+                {renderTable(
+                  "availability",
+                  ["staff_id", "start_at", "end_at"],
+                  manager,
+                )}
               </section>
               <section className="card">
-                {toolbar("Preferences", admin ? ["preferences"] : [])}
-                {renderTable("preferences", [
-                  "staff_id",
-                  "start_at",
-                  "end_at",
-                  "preferred",
-                ])}
+                {toolbar("Preferences", manager ? ["preferences"] : [])}
+                {renderTable(
+                  "preferences",
+                  ["staff_id", "start_at", "end_at", "preferred"],
+                  manager,
+                )}
+                {toolbar(
+                  "Public holidays for review",
+                  admin ? ["public_holidays"] : [],
+                )}
+                {renderTable("public_holidays", ["day", "name"], admin)}
               </section>
             </>
           )}
           {section === "Rosters" && (
             <>
               <section className="card">
-                {toolbar("Roster periods", admin ? ["roster"] : [])}
+                {toolbar("Roster periods", manager ? ["roster"] : [])}
                 {renderTable("rosters", [
                   "ward_id",
                   "start_date",
@@ -1037,33 +1431,38 @@ export default function Dashboard({
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2 mb-5">
-                    {admin && detail.snapshot.roster.status !== "published" && (
-                      <>
-                        {[
-                          "generate",
-                          "process",
-                          "validate",
-                          "publish",
-                          "cancel",
-                        ].map((action) => (
-                          <button
-                            key={action}
-                            className="primary text-sm capitalize"
-                            disabled={
-                              loading ||
-                              (action === "publish" && !detail.validation.valid)
-                            }
-                            onClick={() => void rosterAction(action)}
-                          >
-                            {action === "process"
-                              ? "Check Timefold job"
-                              : action === "generate"
-                                ? "Generate with Timefold"
-                                : action}
-                          </button>
-                        ))}
-                      </>
-                    )}
+                    {manager &&
+                      detail.snapshot.roster.status !== "published" && (
+                        <>
+                          {[
+                            "generate",
+                            "process",
+                            "validate",
+                            "publish",
+                            "cancel",
+                          ]
+                            .filter((action) => action !== "publish" || admin)
+                            .concat(admin ? [] : ["approve"])
+                            .map((action) => (
+                              <button
+                                key={action}
+                                className="primary text-sm capitalize"
+                                disabled={
+                                  loading ||
+                                  (["publish", "approve"].includes(action) &&
+                                    !detail.validation.valid)
+                                }
+                                onClick={() => void rosterAction(action)}
+                              >
+                                {action === "process"
+                                  ? "Check Timefold job"
+                                  : action === "generate"
+                                    ? "Generate with Timefold"
+                                    : action}
+                              </button>
+                            ))}
+                        </>
+                      )}
                   </div>
                   {detail.jobs.map((job) => (
                     <p key={job.id} className="muted mb-2">
@@ -1081,6 +1480,15 @@ export default function Dashboard({
                     <div className="error mb-2 text-sm" key={i}>
                       {v.message}
                     </div>
+                  ))}
+                  <RosterGrid
+                    snapshot={detail.snapshot}
+                    ranks={data.ranks || []}
+                  />
+                  {detail.validation.warnings?.map((warning, i) => (
+                    <p className="notice mb-2" key={i}>
+                      {warning}
+                    </p>
                   ))}
                   <div className="overflow-x-auto">
                     <table>
@@ -1116,7 +1524,7 @@ export default function Dashboard({
                                       )?.full_name,
                                   )
                                   .join(", ") || "Unassigned"}
-                                {admin &&
+                                {manager &&
                                   !["published", "generating"].includes(
                                     detail.snapshot.roster.status,
                                   ) && (
@@ -1151,7 +1559,7 @@ export default function Dashboard({
                                         ))}
                                     </select>
                                   )}
-                                {admin &&
+                                {manager &&
                                   !["published", "generating"].includes(
                                     detail.snapshot.roster.status,
                                   ) &&
@@ -1315,58 +1723,145 @@ export default function Dashboard({
                 ×
               </button>
             </div>
-            <form onSubmit={submit}>
-              {(form === "onboard"
-                ? catalog.hospitals
-                : catalog[form]
-              ).fields.map((field) => (
-                <div key={field.key}>
-                  <label htmlFor={field.key}>{field.label}</label>
-                  {field.source || field.options ? (
-                    <select
-                      id={field.key}
-                      name={field.key}
-                      required={!field.optional}
-                      defaultValue={String(editing?.[field.key] || "")}
-                    >
-                      <option value="">Select…</option>
-                      {(
-                        field.options ||
-                        (data[field.source!] || []).map((r) => [r.id!, name(r)])
-                      ).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      id={field.key}
-                      name={field.key}
-                      type={
-                        field.type === "array" ? "text" : field.type || "text"
-                      }
-                      required={!field.optional && field.type !== "checkbox"}
-                      defaultChecked={
-                        field.type === "checkbox"
-                          ? editing
-                            ? !!editing[field.key]
-                            : true
-                          : undefined
-                      }
-                      defaultValue={
-                        field.type === "checkbox"
-                          ? undefined
-                          : Array.isArray(editing?.[field.key])
-                            ? (editing![field.key] as string[]).join(",")
+            <form
+              onSubmit={submit}
+              onChange={(e) => {
+                if (form !== "shift_templates") return;
+                const values = new FormData(e.currentTarget);
+                setClockPreview({
+                  start: String(values.get("start_time") || ""),
+                  end: String(values.get("end_time") || ""),
+                });
+                const target = e.target as unknown as HTMLInputElement;
+                if (["start_time", "end_time"].includes(target.name)) {
+                  const confirmation = e.currentTarget.elements.namedItem(
+                    "times_confirmed",
+                  ) as HTMLInputElement | null;
+                  if (confirmation) confirmation.checked = false;
+                }
+              }}
+            >
+              {form === "shift_templates" && (
+                <div className="card mb-5">
+                  <p>
+                    Use 24-hour times in {timezone}. Template edits affect newly
+                    generated shifts; existing dated shifts and published
+                    rosters stay unchanged.
+                  </p>
+                  {clockPreview.start &&
+                    clockPreview.end &&
+                    (() => {
+                      const minutes = (t: string) =>
+                        Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+                      const start = minutes(clockPreview.start),
+                        end = minutes(clockPreview.end),
+                        overnight = end <= start,
+                        duration = end - start + (overnight ? 1440 : 0);
+                      return (
+                        <p role="status">
+                          {clockPreview.start.slice(0, 5)} →{" "}
+                          {clockPreview.end.slice(0, 5)} (
+                          {overnight ? "following day" : "same day"}), duration{" "}
+                          {(duration / 60).toFixed(2)} hours.{" "}
+                          {duration >= 720
+                            ? "Long shift: check AM/PM, fatigue limits and institutional approval."
+                            : ""}
+                        </p>
+                      );
+                    })()}
+                </div>
+              )}
+              {form === "staff" && (
+                <p className="muted mb-4">
+                  Permitted Shifts are mandatory prohibitions. Turning all three
+                  Off leaves this nurse unschedulable. Changes affect future
+                  generation and validation; published assignments are
+                  preserved.
+                </p>
+              )}
+              {(form === "onboard" ? catalog.hospitals : catalog[form]).fields
+                .filter((f) => !f.hospitalOnly || admin)
+                .map((field) => (
+                  <div key={field.key}>
+                    <label htmlFor={field.key}>{field.label}</label>
+                    {field.source || field.options ? (
+                      <select
+                        id={field.key}
+                        name={field.key}
+                        required={!field.optional}
+                        multiple={field.type === "multi"}
+                        defaultValue={
+                          field.type === "multi"
+                            ? (editing?.[field.key] as string[]) || []
                             : String(
                                 editing?.[field.key] ?? field.default ?? "",
                               )
-                      }
-                    />
-                  )}
-                </div>
-              ))}
+                        }
+                      >
+                        {field.type !== "multi" && (
+                          <option value="">Select…</option>
+                        )}
+                        {(
+                          field.options ||
+                          (field.source === "skills"
+                            ? [
+                                ...(data.qualifications || []).map((r) => [
+                                  r.id!,
+                                  `Qualification: ${name(r)}`,
+                                ]),
+                                ...(data.ranks || []).map((r) => [
+                                  `rank:${r.id}`,
+                                  `Rank: ${name(r)}`,
+                                ]),
+                              ]
+                            : (data[field.source!] || []).map((r) => [
+                                r.id!,
+                                name(r),
+                              ]))
+                        ).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        id={field.key}
+                        name={field.key}
+                        type={
+                          field.type === "array" ? "text" : field.type || "text"
+                        }
+                        required={!field.optional && field.type !== "checkbox"}
+                        defaultChecked={
+                          field.type === "checkbox"
+                            ? editing
+                              ? !!editing[field.key]
+                              : field.default !== "false"
+                            : undefined
+                        }
+                        defaultValue={
+                          field.type === "checkbox"
+                            ? undefined
+                            : field.type === "date" &&
+                                ["start_at", "end_at"].includes(field.key) &&
+                                editing?.[field.key]
+                              ? localDay(
+                                  new Date(
+                                    Date.parse(String(editing[field.key])) -
+                                      (field.key === "end_at" ? 1 : 0),
+                                  ).toISOString(),
+                                  timezone,
+                                )
+                              : Array.isArray(editing?.[field.key])
+                                ? (editing![field.key] as string[]).join(",")
+                                : String(
+                                    editing?.[field.key] ?? field.default ?? "",
+                                  )
+                        }
+                      />
+                    )}
+                  </div>
+                ))}
               {message && (
                 <p role="alert" className="error mt-4">
                   {message}

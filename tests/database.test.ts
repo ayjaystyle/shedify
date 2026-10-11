@@ -33,6 +33,7 @@ beforeAll(async () => {
   for (const file of readdirSync("supabase/migrations").sort())
     await pg.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
   await pg.exec(readFileSync("supabase/live-privileges.sql", "utf8"));
+
   await pg.query("insert into auth.users values($1),($2),($3),($4)", [
     admin,
     nurse,
@@ -413,3 +414,116 @@ describe("PostgreSQL migrations and RLS (PGlite, emulated Supabase Auth)", () =>
     ).toHaveLength(2);
   });
 });
+
+describe("ward nursing configuration security", () => {
+  it("preserves existing nurse permissions with safe defaults", async () => {
+    const n = (
+      await pg.query(
+        "select morning_enabled,afternoon_enabled,night_enabled from staff where id=$1",
+        [staff],
+      )
+    ).rows[0];
+    expect(n).toEqual({
+      morning_enabled: true,
+      afternoon_enabled: true,
+      night_enabled: true,
+    });
+  });
+  it("allows scoped ward policies but rejects cross-ward writes and institutional self-approval", async () => {
+    await asUser(wardAdmin, () =>
+      pg.query(
+        "insert into ward_policies(hospital_id,ward_id,effective_from) values($1,$2,'2026-11-02')",
+        [hospital, ward],
+      ),
+    );
+    await expect(
+      asUser(wardAdmin, () =>
+        pg.query(
+          "insert into ward_policies(hospital_id,ward_id,effective_from) values($1,$2,'2026-11-02')",
+          [hospital, otherWard],
+        ),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(wardAdmin, () =>
+        pg.query(
+          "update ward_policies set institutional_approved=true,safety_reference='Not formal authorization',max_night_minutes=720 where ward_id=$1",
+          [ward],
+        ),
+      ),
+    ).rejects.toThrow("hospital oversight");
+    await expect(
+      asUser(wardAdmin, () =>
+        pg.query("delete from ward_policies where ward_id=$1", [ward]),
+      ),
+    ).rejects.toThrow("retained");
+    await expect(
+      asUser(nurse, () =>
+        pg.query(
+          "insert into ward_policies(hospital_id,ward_id,effective_from) values($1,$2,'2026-11-02')",
+          [hospital, otherWard],
+        ),
+      ),
+    ).rejects.toThrow();
+  });
+  it("enforces future four-week periods and prevents overlap without changing existing periods", async () => {
+    await asUser(wardAdmin, () =>
+      pg.query("update ward_policies set enabled=true where ward_id=$1", [
+        ward,
+      ]),
+    );
+    await expect(
+      pg.query(
+        "insert into rosters(hospital_id,ward_id,start_date,end_date) values($1,$2,'2026-11-02','2026-11-08')",
+        [hospital, ward],
+      ),
+    ).rejects.toThrow("28-day");
+    await expect(
+      pg.query(
+        "insert into rosters(hospital_id,ward_id,start_date,end_date,created_by) values($1,$2,'2026-11-02','2026-11-29',$3)",
+        [hospital, ward, admin],
+      ),
+    ).rejects.toThrow("continue directly");
+    const fresh = (
+      await pg.query<{ id: string }>(
+        "insert into wards(hospital_id,name) values($1,'Nursing policy test') returning id",
+        [hospital],
+      )
+    ).rows[0].id;
+    await pg.query(
+      "insert into ward_policies(hospital_id,ward_id,effective_from,enabled) values($1,$2,'2026-11-02',true)",
+      [hospital, fresh],
+    );
+    await pg.query(
+      "insert into rosters(hospital_id,ward_id,start_date,end_date,created_by) values($1,$2,'2026-11-02','2026-11-29',$3)",
+      [hospital, fresh, admin],
+    );
+    await expect(
+      pg.query(
+        "insert into rosters(hospital_id,ward_id,start_date,end_date,created_by) values($1,$2,'2026-11-02','2026-11-29',$3)",
+        [hospital, fresh, admin],
+      ),
+    ).rejects.toThrow("overlap");
+    await expect(
+      asUser(wardAdmin, () =>
+        pg.query("update ward_policies set enabled=false where ward_id=$1", [
+          ward,
+        ]),
+      ),
+    ).rejects.toThrow("cannot be disabled");
+  });
+});
+
+describe('hospital oversight and leave',()=>{
+ it('locks nurse permissions against ward overrides',async()=>{
+  await asUser(admin,()=>pg.query('update staff set permissions_locked=true where id=$1',[staff]));
+  await expect(asUser(wardAdmin,()=>pg.query('update staff set night_enabled=false where id=$1',[staff]))).rejects.toThrow('Hospital-locked');
+  await asUser(admin,()=>pg.query('update staff set permissions_locked=false where id=$1',[staff]));
+ });
+ it('enforces nurse and attendant annual entitlements',async()=>{
+  await expect(asUser(admin,()=>pg.query("insert into availability(hospital_id,staff_id,start_at,end_at,leave_type) values($1,$2,'2028-01-01T00:00:00Z','2028-02-13T00:00:00Z','annual')",[hospital,staff]))).rejects.toThrow('entitlement');
+  const attendant=(await pg.query<{id:string}>("insert into staff(hospital_id,ward_id,full_name,category) values($1,$2,'Fictional attendant','attendant') returning id",[hospital,ward])).rows[0].id;
+  await expect(asUser(admin,()=>pg.query("insert into availability(hospital_id,staff_id,start_at,end_at,leave_type) values($1,$2,'2028-01-01T00:00:00Z','2028-01-30T00:00:00Z','annual')",[hospital,attendant]))).rejects.toThrow('entitlement');
+ });
+});
+

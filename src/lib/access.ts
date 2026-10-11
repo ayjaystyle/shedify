@@ -29,3 +29,10 @@ export async function rosterAccess(id: string, admin = false) {
   await hospitalAccess(data.hospital_id, admin);
   return { db, user, roster: data };
 }
+export async function rosterManagementAccess(id: string) {
+  const access = await rosterAccess(id);
+  const membership = await hospitalAccess(access.roster.hospital_id);
+  if (membership.role === "nurse")
+    throw new AppError("You cannot manage this roster.", 403);
+  return access;
+}

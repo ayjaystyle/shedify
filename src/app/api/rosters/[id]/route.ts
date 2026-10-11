@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { rosterAccess } from "@/lib/access";
+import { rosterAccess, rosterManagementAccess } from "@/lib/access";
 import { serviceDb } from "@/lib/db";
 import { AppError, failure, guardOrigin } from "@/lib/http";
 import { assignmentSchema } from "@/domain/model";
@@ -49,7 +49,7 @@ export async function POST(request: Request, context: Context) {
     guardOrigin(request);
     const { id } = await context.params;
     z.uuid().parse(id);
-    const { user } = await rosterAccess(id, true);
+    const { user, roster } = await rosterManagementAccess(id);
     const body = z
       .object({
         action: z.enum([
@@ -59,6 +59,7 @@ export async function POST(request: Request, context: Context) {
           "edit",
           "process",
           "cancel",
+          "approve",
         ]),
         assignments: z.array(assignmentSchema).max(20000).optional(),
       })
@@ -86,7 +87,32 @@ export async function POST(request: Request, context: Context) {
       case "validate":
         return NextResponse.json(validateRoster(await snapshot(id)));
       case "publish":
+        await rosterAccess(id, true);
         return NextResponse.json(await publish(id, user.id));
+      case "approve": {
+        const data = await snapshot(id);
+        const validation = validateRoster(data);
+        if (!validation.valid)
+          throw new AppError(
+            "Approval blocked: " +
+              validation.violations
+                .slice(0, 3)
+                .map((v) => v.message)
+                .join(" "),
+            409,
+          );
+        if (roster.status === "published" || roster.status === "generating")
+          throw new AppError("This roster cannot be approved.", 409);
+        // Final publication still uses the atomic, revision-checked hospital-oversight RPC.
+        const { error } = await db.rpc("review_roster", {
+          p_roster: id,
+          p_actor: user.id,
+          p_expected: data.revision,
+          p_validation: validation,
+        });
+        if (error) throw new AppError("Review could not be recorded.", 409);
+        return NextResponse.json({ reviewed: true, validation });
+      }
       case "edit":
         if (!body.assignments) throw new AppError("Assignments are required.");
         return NextResponse.json(await edit(id, user.id, body.assignments));
