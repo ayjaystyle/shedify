@@ -18,7 +18,7 @@ Enabled policy requires 28-day Monday–Sunday periods, no overlap and direct co
 
 Calendar forms support annual/sick/other absence, shift-specific preferences, notes, editing and removal. Annual leave entitlement is enforced per calendar year: 42 days for nurses, 28 for attendants. Calendar end dates are inclusive and converted in the hospital timezone. Sick leave is recorded when known. Attendants are excluded from nursing seats and senior coverage.
 
-Public holidays are flagged for review. A rank-ordered grid displays M/A/N/O/L, holiday flags, CSV export and browser printing. O means no shift starts; an overnight duty can still finish on that day. Invalid candidates cannot be reviewed or published, and publication validates again under a tenant revision lock. Reviews persist the validation revision.
+Public holidays are flagged for review. A rank-ordered grid displays M/A/N/O/L, holiday flags, CSV export and browser printing. O means no shift starts; an overnight duty can still finish on that day. A missing or disabled nursing policy cannot bypass mandatory checks for operational shifts. Invalid candidates cannot be reviewed or published, and publication validates again under a tenant revision lock. Reviews persist the validation revision.
 
 ## Database migrations and preservation
 
@@ -86,4 +86,4 @@ A Sunday Night ending Monday morning occupies part of the nominal Monday Off day
 
 Custom SMTP remains a future requirement for reliable unrestricted invitations/registration. Development uses Supabase's permitted built-in email limits and authorized accounts, with public signup disabled. SMTP is not a blocker for the development demonstration stage.
 
-Automated release checks: TypeScript and ESLint passed. An earlier production build passed; the final local build rerun was blocked by Windows sandbox access during SWC path canonicalization. The release build is verified on Vercel. The full suite contains 84 automated cases and two explicitly opt-in live cases; live feasible/infeasible runs passed separately. Local Windows validation uses `npm test -- --maxWorkers=1 --no-isolate` with a workspace temporary directory to avoid sandbox temporary-cache loss.
+Automated release checks: TypeScript and ESLint passed. An earlier production build passed; the final local build rerun was blocked by Windows sandbox access during SWC path canonicalization. The release build is verified on Vercel. The full suite contains 85 automated cases and two explicitly opt-in live cases; live feasible/infeasible runs passed separately. Local Windows validation uses `npm test -- --maxWorkers=1 --no-isolate` with a workspace temporary directory to avoid sandbox temporary-cache loss.

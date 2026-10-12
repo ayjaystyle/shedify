@@ -9,6 +9,11 @@ import { effectiveRule } from "@/domain/rules";
 const rules = (d: ReturnType<typeof nursingFixture>) =>
   validateRoster(d).violations.map((v) => v.rule);
 describe("mandatory nursing policy", () => {
+  it("prevents bypassing mandatory rules by omitting the ward policy", () => {
+    const d = nursingFixture();
+    d.policy = null;
+    expect(rules(d)).toContain("policy_required");
+  });
   it("retains stricter hospital and saved ward limits", () => {
     const d = nursingFixture();
     d.rules = [

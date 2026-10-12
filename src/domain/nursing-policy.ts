@@ -76,7 +76,20 @@ export function validateNursingPolicy(
         [],
         [s.id],
       );
-  if (!policy) return { violations, warnings };
+  if (!policy) {
+    if (
+      data.shifts.some(
+        (s) =>
+          s.times_confirmed === true ||
+          (s.shift_type && s.shift_type !== "unspecified"),
+      )
+    )
+      fail(
+        "policy_required",
+        "Configure and enable the ward nursing policy before approving or publishing operational shifts. A disabled or missing policy cannot bypass mandatory nursing rules.",
+      );
+    return { violations, warnings };
+  }
   if (
     weekStart(data.roster.start_date) !== data.roster.start_date ||
     dayIndex(data.roster.end_date) - dayIndex(data.roster.start_date) !== 27
