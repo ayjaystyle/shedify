@@ -6,6 +6,7 @@ import {
   type Violation,
 } from "./model";
 import { localMidnight } from "./time";
+import { effectiveRule } from "./rules";
 export const addDays = (day: string, n: number) =>
   new Date((dayIndex(day) + n) * 86400000).toISOString().slice(0, 10);
 export const weekStart = (day: string) =>
@@ -123,11 +124,12 @@ export function validateNursingPolicy(
       s.shift_type === "night" &&
       (!policy.institutional_approved ||
         !policy.safety_reference ||
-        !policy.max_night_minutes)
+        !policy.max_night_minutes ||
+        !effectiveRule(data, "min_rest_minutes"))
     )
       fail(
         "night_safety_review",
-        `${s.name} on ${day}: institutional Night-duty approval, reference and duration limit are required.`,
+        `${s.name} on ${day}: institutional Night-duty approval, reference, duration limit and positive minimum rest are required.`,
         [],
         [s.id],
       );

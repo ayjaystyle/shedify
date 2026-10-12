@@ -118,6 +118,20 @@ const schemas = {
       effective_from: z.iso.date(),
       safety_reference: z.string().max(1000).nullable(),
       max_night_minutes: z.number().int().min(1).max(1440).nullable(),
+      minimum_rest_minutes: z
+        .number()
+        .int()
+        .min(0)
+        .max(2880)
+        .nullable()
+        .optional(),
+      maximum_consecutive_days: z
+        .number()
+        .int()
+        .min(1)
+        .max(31)
+        .nullable()
+        .optional(),
       institutional_approved: z.boolean().optional(),
     })
     .strict(),
@@ -200,6 +214,7 @@ export async function GET(request: Request) {
       "night_teams",
       "rotation_obligations",
       "public_holidays",
+      "roster_reviews",
     ];
     const results = await Promise.all(
       names.map(async (name) => {
@@ -455,11 +470,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
     let input = body.data;
-    if (body.action === 'update' && body.id) {
-      const {data:existing}=await db.from(entity).select('*').eq('id',body.id).maybeSingle();
-      if (!existing) throw new AppError('Record not found.',404);
-      const saved=Object.fromEntries(Object.keys(schemas[entity].shape).filter(key=>existing[key]!==undefined).map(key=>[key,existing[key]]));
-      input={...saved,...body.data};
+    if (body.action === "update" && body.id) {
+      const { data: existing } = await db
+        .from(entity)
+        .select("*")
+        .eq("id", body.id)
+        .maybeSingle();
+      if (!existing) throw new AppError("Record not found.", 404);
+      const saved = Object.fromEntries(
+        Object.keys(schemas[entity].shape)
+          .filter((key) => existing[key] !== undefined)
+          .map((key) => [key, existing[key]]),
+      );
+      input = { ...saved, ...body.data };
     }
     const data = schemas[entity].parse(input);
     if (entity === "memberships") {

@@ -148,6 +148,11 @@ export function mapRequest(data: Snapshot) {
           .map((v) => v.message)
           .join(" "),
       );
+    const maximum = rule("max_consecutive_days");
+    if (maximum !== undefined && maximum < 7)
+      throw new SolverError(
+        `The seven-night block conflicts with the mandatory maximum of ${maximum} consecutive days. Hospital oversight must resolve this safety-policy conflict; no rule is overridden automatically.`,
+      );
   }
   const contract = {
     id: "ward-contract",
@@ -239,9 +244,43 @@ export function mapRequest(data: Snapshot) {
         ? ["shedify:senior"]
         : []),
     ].map((id) => ({ id })),
-    unavailableTimeSpans: data.availability
-      .filter((x) => x.staff_id === s.id)
-      .map((x) => ({ start: time(x.start_at), end: time(x.end_at) })),
+    unavailableTimeSpans: [
+      ...data.availability
+        .filter((x) => x.staff_id === s.id)
+        .map((x) => ({ start: time(x.start_at), end: time(x.end_at) })),
+      ...(data.policy
+        ? [
+            ...(data.obligations || []).map((o) => ({
+              staff_id: o.staff_id,
+              week_start: o.night_start,
+            })),
+            ...(data.night_teams || []),
+          ]
+            .filter((o) => o.staff_id === s.id)
+            .flatMap((o) => {
+              const last = [...data.shifts, ...data.history.map((h) => h.shift)]
+                .filter(
+                  (shift) =>
+                    shift.shift_type === "night" &&
+                    time(shift.start_at).slice(0, 10) ===
+                      addDays(o.week_start, 6),
+                )
+                .sort((a, b) => Date.parse(b.end_at) - Date.parse(a.end_at))[0];
+              return last
+                ? [
+                    {
+                      start: time(last.end_at),
+                      end: time(
+                        new Date(
+                          Date.parse(last.end_at) + 7 * 86400000,
+                        ).toISOString(),
+                      ),
+                    },
+                  ]
+                : [];
+            })
+        : []),
+    ],
     preferredTimeSpans: data.preferences
       .filter((x) => x.staff_id === s.id && x.preferred)
       .flatMap((x) =>
@@ -285,6 +324,23 @@ export function mapRequest(data: Snapshot) {
       .filter((n) => n.week_start === week)
       .map((n) => n.staff_id)
       .sort();
+    const head = data.staff.find((n) => n.id === data.policy?.head_staff_id);
+    const compulsoryHead =
+      head &&
+      s.shift_type === "morning" &&
+      [1, 5].includes(new Date(day + "T00:00:00Z").getUTCDay()) &&
+      !data.holidays?.some((h) => h.day === day) &&
+      !data.availability.some(
+        (a) =>
+          a.staff_id === head.id &&
+          Date.parse(a.start_at) < Date.parse(s.end_at) &&
+          Date.parse(a.end_at) > Date.parse(s.start_at),
+      );
+    const seniorSeat =
+      compulsoryHead &&
+      (!head.rank_id || !data.policy?.senior_rank_ids.includes(head.rank_id))
+        ? 1
+        : 0;
     const commitments = [
       ...(data.obligations || []).map((o) => ({
         staff_id: o.staff_id,
@@ -346,7 +402,7 @@ export function mapRequest(data: Snapshot) {
       end: time(s.end_at),
       requiredSkills: [
         ...s.required_skills,
-        ...(data.policy && i === 0 && s.shift_type !== "night"
+        ...(data.policy && i === seniorSeat && s.shift_type !== "night"
           ? ["shedify:senior"]
           : []),
       ],
@@ -362,7 +418,9 @@ export function mapRequest(data: Snapshot) {
           : "1",
       ...(data.policy && s.shift_type === "night" && team[i]
         ? { employee: team[i], pinned: true }
-        : {}),
+        : compulsoryHead && i === 0
+          ? { employee: head.id, pinned: true }
+          : {}),
     }));
   });
   const employeeIds = new Set(employees.map((e) => e.id));

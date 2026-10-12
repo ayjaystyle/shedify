@@ -4,10 +4,68 @@ import { addDays, weekStart } from "@/domain/nursing-policy";
 import { validateRoster } from "@/domain/validate";
 import { mapRequest } from "@/solver/timefold";
 import { nursingFixture } from "./nursing-fixture";
+import { effectiveRule } from "@/domain/rules";
 
 const rules = (d: ReturnType<typeof nursingFixture>) =>
   validateRoster(d).violations.map((v) => v.rule);
 describe("mandatory nursing policy", () => {
+  it("retains stricter hospital and saved ward limits", () => {
+    const d = nursingFixture();
+    d.rules = [
+      { kind: "max_consecutive_days", value: 4, active: true },
+      { kind: "min_rest_minutes", value: 660, active: true },
+    ];
+    d.policy!.maximum_consecutive_days = 7;
+    d.policy!.minimum_rest_minutes = 300;
+    d.hospital_limits = {
+      maximum_consecutive_days: 3,
+      minimum_rest_minutes: 720,
+    };
+    expect(effectiveRule(d, "max_consecutive_days")).toBe(3);
+    expect(effectiveRule(d, "min_rest_minutes")).toBe(720);
+    expect(() => mapRequest(d)).toThrow("maximum of 3");
+    expect(rules(d)).toContain("max_consecutive_days");
+  });
+  it("enforces Afternoon-to-Morning across a published boundary", () => {
+    const d = nursingFixture(),
+      m = d.shifts.find((s) => s.shift_type === "morning")!,
+      a = d.assignments.find((a) => a.shift_id === m.id)!;
+    d.history = [
+      {
+        staff_id: a.staff_id,
+        shift_id: id(999),
+        shift: {
+          ...m,
+          id: id(999),
+          shift_type: "afternoon",
+          start_at: "2026-10-11T15:00:00+01:00",
+          end_at: "2026-10-11T20:00:00+01:00",
+        },
+      },
+    ];
+    expect(rules(d)).toContain("afternoon_to_morning");
+  });
+  it("maps seven full days of rest and compulsory head Morning duty", () => {
+    const d = nursingFixture();
+    d.policy!.head_staff_id = d.staff[8].id;
+    const input = mapRequest(d);
+    expect(
+      input.modelInput.employees[0].unavailableTimeSpans.some(
+        (s) =>
+          s.start.startsWith("2026-10-19T08:00") &&
+          s.end.startsWith("2026-10-26T08:00"),
+      ),
+    ).toBe(true);
+    expect(
+      input.modelInput.shifts.some(
+        (s) =>
+          s.id.startsWith(d.shifts[0].id) &&
+          "employee" in s &&
+          s.employee === d.staff[8].id &&
+          s.pinned,
+      ),
+    ).toBe(true);
+  });
   it("accepts fixed seven-night teams, four-day ordinary weeks and carryover", () => {
     const d = nursingFixture();
     expect(validateRoster(d).violations).toEqual([]);

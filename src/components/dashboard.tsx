@@ -388,6 +388,20 @@ const catalog: Record<string, { title: string; fields: Field[] }> = {
         optional: true,
       },
       {
+        key: "minimum_rest_minutes",
+        label:
+          "Ward minimum rest between shifts (minutes; stricter hospital rules still apply)",
+        type: "number",
+        optional: true,
+      },
+      {
+        key: "maximum_consecutive_days",
+        label:
+          "Ward maximum consecutive working days (stricter hospital rules still apply)",
+        type: "number",
+        optional: true,
+      },
+      {
         key: "safety_reference",
         label: "Institutional Night-duty policy / approval reference",
         optional: true,
@@ -1359,6 +1373,16 @@ export default function Dashboard({
                   "off_start",
                   "afternoon_start",
                 ])}
+                <p className="muted mb-4">
+                  Ward reviews record the validation revision. Later scheduling
+                  changes require a fresh review; publication always validates
+                  again.
+                </p>
+                {renderTable("roster_reviews", [
+                  "roster_id",
+                  "revision",
+                  "reviewed_at",
+                ])}
               </section>
               <section className="card mb-5">
                 {toolbar("Scheduling constraints", admin ? ["rules"] : [])}
@@ -1374,9 +1398,14 @@ export default function Dashboard({
               </section>
               <section className="card mb-5">
                 {toolbar("Unavailability", manager ? ["availability"] : [])}
+                <p className="muted mb-4">
+                  Annual entitlement: 42 calendar days per year for nurses, 28
+                  for attendants. Record sick leave when known. Annual-leave
+                  return requires Morning in the first actual duty week.
+                </p>
                 {renderTable(
                   "availability",
-                  ["staff_id", "start_at", "end_at"],
+                  ["staff_id", "leave_type", "start_at", "end_at", "note"],
                   manager,
                 )}
               </section>
@@ -1384,7 +1413,14 @@ export default function Dashboard({
                 {toolbar("Preferences", manager ? ["preferences"] : [])}
                 {renderTable(
                   "preferences",
-                  ["staff_id", "start_at", "end_at", "preferred"],
+                  [
+                    "staff_id",
+                    "shift_type",
+                    "start_at",
+                    "end_at",
+                    "preferred",
+                    "note",
+                  ],
                   manager,
                 )}
                 {toolbar(

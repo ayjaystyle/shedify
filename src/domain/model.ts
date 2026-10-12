@@ -58,6 +58,8 @@ export const nursingPolicySchema = z.object({
   safety_reference: z.string().nullable(),
   max_night_minutes: z.number().int().positive().nullable(),
   institutional_approved: z.boolean(),
+  minimum_rest_minutes: z.number().int().nullable().optional(),
+  maximum_consecutive_days: z.number().int().nullable().optional(),
 });
 export const snapshotSchema = z.object({
   hospital_id: z.uuid(),

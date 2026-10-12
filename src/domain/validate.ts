@@ -202,6 +202,43 @@ export function validateRoster(
   }
   const evaluated = [
     ...baseRules,
+    "permitted_shifts",
+    "staff_category",
+    "shift_times",
+    ...(data.hospital_limits?.maximum_consecutive_days
+      ? ["max_consecutive_days"]
+      : []),
+    ...(data.hospital_limits?.minimum_rest_minutes !== null &&
+    data.hospital_limits?.minimum_rest_minutes !== undefined
+      ? ["min_rest_minutes"]
+      : []),
+    ...(data.policy
+      ? [
+          "four_week_period",
+          "senior_configuration",
+          "shift_type",
+          "senior_coverage",
+          "night_safety_review",
+          "night_duration",
+          "one_shift_per_day",
+          "afternoon_to_morning",
+          "no_weekends",
+          "designated_morning_only",
+          "fixed_night_team",
+          "night_team_size",
+          "night_team_senior",
+          "night_team_eligibility",
+          "night_team_unavailability",
+          "weekly_four_days",
+          "head_mandatory_days",
+          "post_night_off",
+          "post_night_afternoon",
+          "post_night_full_rest",
+          "rotation_permission_conflict",
+          "night_frequency",
+          "leave_return_morning",
+        ]
+      : []),
     ...data.rules
       .filter((x) => x.active && !x.kind.startsWith("fair_"))
       .map((x) => x.kind),
@@ -210,7 +247,7 @@ export function validateRoster(
   violations.push(...nursing.violations);
   return {
     valid: !violations.length,
-    passedRules: evaluated.filter(
+    passedRules: [...new Set(evaluated)].filter(
       (rule) => !violations.some((x) => x.rule === rule),
     ),
     violations,

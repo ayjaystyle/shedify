@@ -514,16 +514,77 @@ describe("ward nursing configuration security", () => {
   });
 });
 
-describe('hospital oversight and leave',()=>{
- it('locks nurse permissions against ward overrides',async()=>{
-  await asUser(admin,()=>pg.query('update staff set permissions_locked=true where id=$1',[staff]));
-  await expect(asUser(wardAdmin,()=>pg.query('update staff set night_enabled=false where id=$1',[staff]))).rejects.toThrow('Hospital-locked');
-  await asUser(admin,()=>pg.query('update staff set permissions_locked=false where id=$1',[staff]));
- });
- it('enforces nurse and attendant annual entitlements',async()=>{
-  await expect(asUser(admin,()=>pg.query("insert into availability(hospital_id,staff_id,start_at,end_at,leave_type) values($1,$2,'2028-01-01T00:00:00Z','2028-02-13T00:00:00Z','annual')",[hospital,staff]))).rejects.toThrow('entitlement');
-  const attendant=(await pg.query<{id:string}>("insert into staff(hospital_id,ward_id,full_name,category) values($1,$2,'Fictional attendant','attendant') returning id",[hospital,ward])).rows[0].id;
-  await expect(asUser(admin,()=>pg.query("insert into availability(hospital_id,staff_id,start_at,end_at,leave_type) values($1,$2,'2028-01-01T00:00:00Z','2028-01-30T00:00:00Z','annual')",[hospital,attendant]))).rejects.toThrow('entitlement');
- });
+describe("hospital oversight and leave", () => {
+  it("locks nurse permissions against ward overrides", async () => {
+    await asUser(admin, () =>
+      pg.query("update staff set permissions_locked=true where id=$1", [staff]),
+    );
+    await expect(
+      asUser(wardAdmin, () =>
+        pg.query("update staff set night_enabled=false where id=$1", [staff]),
+      ),
+    ).rejects.toThrow("Hospital-locked");
+    await asUser(admin, () =>
+      pg.query("update staff set permissions_locked=false where id=$1", [
+        staff,
+      ]),
+    );
+  });
+  it("enforces nurse and attendant annual entitlements", async () => {
+    await expect(
+      asUser(admin, () =>
+        pg.query(
+          "insert into availability(hospital_id,staff_id,start_at,end_at,leave_type) values($1,$2,'2028-01-01T00:00:00Z','2028-02-13T00:00:00Z','annual')",
+          [hospital, staff],
+        ),
+      ),
+    ).rejects.toThrow("entitlement");
+    const attendant = (
+      await pg.query<{ id: string }>(
+        "insert into staff(hospital_id,ward_id,full_name,category) values($1,$2,'Fictional attendant','attendant') returning id",
+        [hospital, ward],
+      )
+    ).rows[0].id;
+    await expect(
+      asUser(admin, () =>
+        pg.query(
+          "insert into availability(hospital_id,staff_id,start_at,end_at,leave_type) values($1,$2,'2028-01-01T00:00:00Z','2028-01-30T00:00:00Z','annual')",
+          [hospital, attendant],
+        ),
+      ),
+    ).rejects.toThrow("entitlement");
+  });
 });
 
+it("revokes institutional approval when actual Night template hours change", async () => {
+  await asUser(admin, () =>
+    pg.query(
+      "update ward_policies set safety_reference='Fictional authorized QA',max_night_minutes=720,minimum_rest_minutes=660,institutional_approved=true where ward_id=$1",
+      [ward],
+    ),
+  );
+  const template = (
+    await asUser(admin, () =>
+      pg.query<{ id: string }>(
+        "insert into shift_templates(hospital_id,ward_id,name,shift_type,start_time,end_time,min_staff,max_staff) values($1,$2,'Night approval guard','night','20:00','08:00',2,4) returning id",
+        [hospital, ward],
+      ),
+    )
+  ).rows[0].id;
+  await asUser(wardAdmin, () =>
+    pg.query("update shift_templates set start_time='21:00' where id=$1", [
+      template,
+    ]),
+  );
+  expect(
+    (
+      await pg.query<{
+        institutional_approved: boolean;
+        institutional_approved_by: string | null;
+      }>(
+        "select institutional_approved,institutional_approved_by from ward_policies where ward_id=$1",
+        [ward],
+      )
+    ).rows[0],
+  ).toEqual({ institutional_approved: false, institutional_approved_by: null });
+});

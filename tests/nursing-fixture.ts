@@ -12,6 +12,7 @@ export function nursingFixture() {
     effective_from: d.roster.start_date,
     safety_reference: "Fictional approved QA policy",
     max_night_minutes: 720,
+    minimum_rest_minutes: 660,
     institutional_approved: true,
   };
   d.staff = Array.from({ length: 20 }, (_, n) => ({
